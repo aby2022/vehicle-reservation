@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>车辆预约系统</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🚗</span>
+      <h1 id="siteName">车辆预约系统</h1>
+    </div>
+    <nav class="tabs">
+      <button class="tab active" data-view="calendar">日历</button>
+      <button class="tab" data-view="manage" id="tabManage">管理</button>
+      <button class="tab" data-view="stats">统计</button>
+    </nav>
+    <div class="auth-box">
+      <span id="userState" class="admin-state">未登录</span>
+      <button id="loginBtn" class="btn btn-sm">登录</button>
+      <button id="registerBtn" class="btn btn-sm">注册</button>
+      <button id="logoutBtn" class="btn btn-sm hidden">退出</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 日历视图 -->
+    <section id="view-calendar" class="view active">
+      <div class="cal-toolbar">
+        <button id="prevMonth" class="btn btn-sm">‹</button>
+        <h2 id="calTitle">—</h2>
+        <button id="nextMonth" class="btn btn-sm">›</button>
+        <button id="todayBtn" class="btn btn-sm">今天</button>
+        <div class="cal-filter">
+          <label>车辆筛选：</label>
+          <select id="vehicleFilter"><option value="">全部车辆</option></select>
+        </div>
+      </div>
+      <div class="cal-weekdays">
+        <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+      </div>
+      <div id="calGrid" class="cal-grid"></div>
+      <p class="hint">提示：点击日期新增预约（需登录）；点击预约块可查看/编辑。</p>
+    </section>
+
+    <!-- 管理视图 -->
+    <section id="view-manage" class="view">
+      <div class="panel">
+        <h3>车辆管理</h3>
+        <div id="vehicleList" class="vehicle-list"></div>
+        <div id="vehicleFormWrap" class="form-wrap hidden">
+          <h4>新增 / 编辑车辆</h4>
+          <input type="hidden" id="vehId" />
+          <label>车牌号 <input id="vehPlate" placeholder="如 京A12345" /></label>
+          <label>名称 <input id="vehName" placeholder="如 别克GL8" /></label>
+          <label>类型 <input id="vehType" placeholder="如 商务车" /></label>
+          <label>状态
+            <select id="vehStatus">
+              <option value="available">可用</option>
+              <option value="maintenance">维修中</option>
+            </select>
+          </label>
+          <label>备注 <input id="vehNotes" placeholder="可选" /></label>
+          <div class="form-actions">
+            <button id="vehSave" class="btn">保存</button>
+            <button id="vehCancel" class="btn btn-ghost">取消</button>
+          </div>
+        </div>
+        <button id="addVehicleBtn" class="btn btn-primary">+ 新增车辆</button>
+      </div>
+
+      <div class="panel">
+        <h3>尾号限行规则（按日期区间轮换方案）</h3>
+        <label class="switch-line"><input type="checkbox" id="restEnabled" /> 启用尾号限行</label>
+        <label>城市 <input id="restCity" placeholder="如 北京" /></label>
+        <label class="switch-line"><input type="checkbox" id="restWeekend" /> 周末也限行</label>
+        <label>说明 <input id="restNote" placeholder="限行说明" /></label>
+        <p class="hint">尾号方案按"日期区间"轮换：同一套尾号只在某个日期区间内生效（如 2025.8.22-2025.11.23），其他区间换成另一套。可设置每个方案的"每日限行时段"（如北京高峰 7:00-20:00，留空表示全天）。未落入任何方案的日期不限行。</p>
+        <div id="periodsWrap" class="periods-wrap"></div>
+        <div class="form-actions">
+          <button id="addPeriodBtn" class="btn btn-ghost">+ 添加限行方案（日期区间）</button>
+          <button id="saveRestriction" class="btn btn-primary">保存限行规则</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 统计视图 -->
+    <section id="view-stats" class="view">
+      <div id="statCards" class="stat-cards"></div>
+      <div class="panel">
+        <h3>各车辆使用排行</h3>
+        <div id="usageRank" class="usage-rank"></div>
+      </div>
+      <div class="panel">
+        <h3>近期预约</h3>
+        <div id="recentList" class="recent-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 预约弹窗 -->
+  <div id="resvModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="resvModalTitle">新增预约</h3>
+        <button class="modal-close" data-close>×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="resvId" />
+        <label>车辆 <select id="resvVehicle"></select></label>
+        <label>日期 <input type="date" id="resvDate" /></label>
+        <label class="switch-line"><input type="checkbox" id="resvAllDay" /> 全天</label>
+        <div class="time-row" id="timeRow">
+          <label>开始 <input type="time" id="resvStart" value="09:00" /></label>
+          <label>结束 <input type="time" id="resvEnd" value="17:00" /></label>
+        </div>
+        <div id="resvRestHint" class="hint"></div>
+        <label>使用人员 <input id="resvApplicant" placeholder="姓名（默认填你的账号名）" /></label>
+        <label>目的/事由 <input id="resvPurpose" placeholder="如 客户接待" /></label>
+        <label>目的地 <input id="resvDest" placeholder="如 首都机场" /></label>
+        <label>备注 <input id="resvNotes" placeholder="可选" /></label>
+        <div id="resvWarn" class="warn hidden"></div>
+      </div>
+      <div class="modal-foot">
+        <button id="resvDelete" class="btn btn-danger hidden">删除</button>
+        <button id="resvSave" class="btn btn-primary">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 登录/注册弹窗 -->
+  <div id="authModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="authTitle">登录</h3>
+        <button class="modal-close" data-close>×</button>
+      </div>
+      <div class="modal-body">
+        <div class="auth-tabs">
+          <button id="toLogin" class="tab active" data-mode="login">登录</button>
+          <button id="toRegister" class="tab" data-mode="register">注册</button>
+        </div>
+        <div id="loginForm">
+          <label>用户名 <input id="loginUser" autocomplete="username" /></label>
+          <label>密码 <input id="loginPwd" type="password" autocomplete="current-password" /></label>
+        </div>
+        <div id="registerForm" class="hidden">
+          <label>用户名 <input id="regUser" autocomplete="username" /></label>
+          <label>显示名 <input id="regName" placeholder="将作为预约中的'使用人员'" /></label>
+          <label>密码 <input id="regPwd" type="password" autocomplete="new-password" /></label>
+        </div>
+        <div id="authMsg" class="warn hidden"></div>
+      </div>
+      <div class="modal-foot">
+        <button id="authSubmit" class="btn btn-primary">登录</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

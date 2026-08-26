@@ -1,0 +1,19 @@
+# 在 VPS 上用 nginx 反代（配合 Docker 或 node 直接运行）
+# 假设服务监听 3000，域名 reservation.example.com
+server {
+    listen 80;
+    server_name reservation.example.com;
+
+    # 如需更大上传/超时可调整
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+# 提示：可用 certbot 一键申请免费 HTTPS 证书（Let's Encrypt），
+# 并在前面套一层 Cloudflare 以进一步提升国内访问速度与稳定性。

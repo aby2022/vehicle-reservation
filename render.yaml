@@ -1,0 +1,19 @@
+# Render 一键部署配置（免费版即可获得公网 HTTPS 域名，访问稳定快速）
+# 部署步骤：
+# 1. 把本项目推送到 GitHub
+# 2. 打开 https://dashboard.render.com → New → BluePrint → 关联仓库 → 选择本文件
+# 3. 点击 Create，稍等约 1 分钟即获得 https://xxxx.onrender.com 公网地址
+#
+# 说明：PORT 由 Render 自动注入，无需在 envVars 中指定；
+#       本项目零依赖，build 阶段仅执行占位命令，真正启动为 node server.js。
+services:
+  - type: web
+    name: vehicle-reservation
+    runtime: node
+    plan: free
+    buildCommand: "echo no-build"
+    startCommand: "node server.js"
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: "production"

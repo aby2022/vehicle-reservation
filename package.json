@@ -1,0 +1,14 @@
+{
+  "name": "vehicle-reservation",
+  "version": "1.0.0",
+  "description": "车辆预约网站工具：日历展示预约情况、尾号限行规则、车辆使用管理，零依赖可公网部署。",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "license": "MIT"
+}
