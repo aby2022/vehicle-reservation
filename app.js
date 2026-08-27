@@ -248,6 +248,7 @@ function bannerHTML() {
   return `<div class="ri">✅</div><div><div class="rl">今日不限行</div><div class="rd"></div><div class="rn">${WD[wd]}无尾号限行</div></div>`;
 }
 function cellInfo(v, ds) {
+  const esc = s => (s == null ? '?' : String(s)).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
   const isPast = ds < todayStr();
   const per = vehiclePeriodOn(v, ds);
   if (per && per.type === 'damage') return { cls: 'unavailable', txt: '损坏' };
@@ -255,12 +256,12 @@ function cellInfo(v, ds) {
   const books = state.reservations.filter(r => r.vehicleId === v.id && r.date === ds && r.status !== 'cancelled');
   const rest = isRestOn(ds, v.plate);
   if (isPast) {
-    if (books.length) return { cls: 'past', txt: books.map(b => (b.applicant || '?')[0]).join(',') };
+    if (books.length) return { cls: 'past', txt: books.map(b => esc(b.applicant)).join('<br>') };
     return { cls: 'past', txt: '—' };
   }
   if (books.length) {
-    const users = books.map(b => (b.applicant || '?').slice(0, 2)).join(',');
-    return { cls: rest ? 'restricted-booked' : 'booked', txt: rest ? users + '限' : users };
+    const names = books.map(b => esc(b.applicant)).join('<br>');
+    return { cls: rest ? 'restricted-booked' : 'booked', txt: rest ? names + '<br>限' : names };
   }
   return { cls: rest ? 'restricted-free' : 'free', txt: rest ? '限行' : '可约' };
 }
