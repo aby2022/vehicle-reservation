@@ -20,12 +20,11 @@
       const url = `${API}/repos/${c.owner}/${c.repo}/contents/${encodeURIComponent(c.path)}?ref=${c.branch}`;
       const res = await fetch(url, { headers: { 'Authorization': 'token ' + c.pat } });
       if (res.status === 404) {
-        _cache = defaultData();
-        _sha = null;
-        await persist('init data.json');   // 首次创建文件
-        return;
+        // 危险操作防护：404 一律视为「读取失败」，绝不再自动用空数据覆盖写入，
+        // 避免 Gitee API 抖动（误报 404）把线上真实数据清空。
+        throw new Error('Gitee 读取失败 HTTP 404：数据文件不存在，请确认仓库已初始化');
       }
-      if (!res.ok) throw new Error('Gitee 读取失败 HTTP ' + res.status);
+      if (!res.ok) throw new Error('Gitee 读取失败 HTTP ' + res.status + '，请检查网络或令牌后重试');
       const j = await res.json();
       _cache = JSON.parse(b64decode(j.content));
       _sha = j.sha;
@@ -35,16 +34,20 @@
 
   async function persist(message) {
     const c = conf();
-    // 每次写回前先拉取最新 sha：避免本地缓存的 sha 过期导致 Gitee 返回 400(Blob SHA does not match)
+    // 安全护栏：本地数据未成功加载（_cache 为 null）时，拒绝写入，
+    // 避免用空数据/失败回退覆盖线上真实数据（本次事故的根因即此）。
+    if (_cache == null) {
+      throw new Error('本地数据尚未加载，已阻止写入以防覆盖 Gitee 数据，请刷新页面后重试');
+    }
+    // 每次写回前只刷新 sha（绝不回写内容到 _cache，_cache 已含本地改动）：
+    // 避免本地缓存的 sha 过期导致 Gitee 返回 400(Blob SHA does not match)
     try {
       const head = await fetch(`${API}/repos/${c.owner}/${c.repo}/contents/${encodeURIComponent(c.path)}?ref=${c.branch}`, { headers: { 'Authorization': 'token ' + c.pat } });
       if (head.ok) {
         const hj = await head.json();
         _sha = hj.sha;
-        if (!_cache) _cache = JSON.parse(b64decode(hj.content));
       } else if (head.status === 404) {
         _sha = null;
-        if (!_cache) _cache = defaultData();
       }
     } catch (e) { /* 网络异常时仍尝试用本地 _sha */ }
 
