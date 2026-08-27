@@ -1,0 +1,462 @@
+{
+  "users": [
+    {
+      "username": "yang",
+      "passwordHash": "29ddb1d98198bf64e86bee87b21efe8fe506403bd9d0ffc6ed4ab6ea9a384f9e",
+      "displayName": "杨",
+      "role": "admin"
+    },
+    {
+      "username": "testvr_1787733288890",
+      "passwordHash": "db5782c02b57ab9833b3930af790176cefa9d49feb9174b246da41455db110c3",
+      "displayName": "testvr_1787733288890",
+      "role": "user"
+    }
+  ],
+  "vehicles": [
+    {
+      "id": "v-A7BB36",
+      "plate": "京A7BB36",
+      "name": "",
+      "type": "",
+      "status": "available",
+      "notes": "",
+      "periods": []
+    },
+    {
+      "id": "v-KCU505",
+      "plate": "京KCU505",
+      "name": "",
+      "type": "",
+      "status": "available",
+      "notes": "",
+      "periods": []
+    },
+    {
+      "id": "v-FCF793",
+      "plate": "京FCF793",
+      "name": "",
+      "type": "",
+      "status": "available",
+      "notes": "",
+      "periods": []
+    },
+    {
+      "id": "v-N9E1A9",
+      "plate": "京N9E1A9",
+      "name": "",
+      "type": "",
+      "status": "available",
+      "notes": "",
+      "periods": []
+    }
+  ],
+  "reservations": [
+    {
+      "id": "bd20f4725c81",
+      "vehicleId": "v-A7BB36",
+      "date": "2026-08-12",
+      "allDay": false,
+      "startTime": "12:00",
+      "endTime": "17:00",
+      "applicant": "222",
+      "purpose": "放孔",
+      "destination": "丰台",
+      "notes": "",
+      "forced": false,
+      "createdBy": "74c5e74ab21f",
+      "createdName": "杨",
+      "createdAt": "2026-08-26T08:23:26.307Z",
+      "status": "pending"
+    },
+    {
+      "id": "5497496fb301",
+      "vehicleId": "v-A7BB36",
+      "date": "2026-08-27",
+      "allDay": false,
+      "startTime": "09:00",
+      "endTime": "10:00",
+      "applicant": "测试员",
+      "purpose": "开会",
+      "destination": "望京SOHO",
+      "notes": "",
+      "forced": false,
+      "status": "cancelled",
+      "createdBy": "admin",
+      "createdName": "管理员",
+      "createdAt": "2026-08-27T01:11:59.879Z"
+    }
+  ],
+  "restriction": {
+    "enabled": true,
+    "city": "北京",
+    "weekendRestricted": false,
+    "note": "导入自小程序：北京尾号限行按日期区间轮换（2025-2027），高峰时段 7:00-20:00（五环内）。未落入任何方案的日期不限行。",
+    "periods": [
+      {
+        "id": "mini-p1",
+        "name": "2025.3.31-2025.6.29 限行方案",
+        "startDate": "2025-03-31",
+        "endDate": "2025-06-29",
+        "peakStart": "07:00",
+        "peakEnd": "20:00",
+        "rules": [
+          {
+            "weekday": 1,
+            "tails": [
+              1,
+              6
+            ]
+          },
+          {
+            "weekday": 2,
+            "tails": [
+              2,
+              7
+            ]
+          },
+          {
+            "weekday": 3,
+            "tails": [
+              3,
+              8
+            ]
+          },
+          {
+            "weekday": 4,
+            "tails": [
+              4,
+              9
+            ]
+          },
+          {
+            "weekday": 5,
+            "tails": [
+              5,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mini-p2",
+        "name": "2025.6.30-2025.9.28 限行方案",
+        "startDate": "2025-06-30",
+        "endDate": "2025-09-28",
+        "peakStart": "07:00",
+        "peakEnd": "20:00",
+        "rules": [
+          {
+            "weekday": 1,
+            "tails": [
+              5,
+              0
+            ]
+          },
+          {
+            "weekday": 2,
+            "tails": [
+              1,
+              6
+            ]
+          },
+          {
+            "weekday": 3,
+            "tails": [
+              2,
+              7
+            ]
+          },
+          {
+            "weekday": 4,
+            "tails": [
+              3,
+              8
+            ]
+          },
+          {
+            "weekday": 5,
+            "tails": [
+              4,
+              9
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mini-p3",
+        "name": "2025.9.29-2025.12.28 限行方案",
+        "startDate": "2025-09-29",
+        "endDate": "2025-12-28",
+        "peakStart": "07:00",
+        "peakEnd": "20:00",
+        "rules": [
+          {
+            "weekday": 1,
+            "tails": [
+              4,
+              9
+            ]
+          },
+          {
+            "weekday": 2,
+            "tails": [
+              5,
+              0
+            ]
+          },
+          {
+            "weekday": 3,
+            "tails": [
+              1,
+              6
+            ]
+          },
+          {
+            "weekday": 4,
+            "tails": [
+              2,
+              7
+            ]
+          },
+          {
+            "weekday": 5,
+            "tails": [
+              3,
+              8
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mini-p4",
+        "name": "2025.12.29-2026.3.29 限行方案",
+        "startDate": "2025-12-29",
+        "endDate": "2026-03-29",
+        "peakStart": "07:00",
+        "peakEnd": "20:00",
+        "rules": [
+          {
+            "weekday": 1,
+            "tails": [
+              3,
+              8
+            ]
+          },
+          {
+            "weekday": 2,
+            "tails": [
+              4,
+              9
+            ]
+          },
+          {
+            "weekday": 3,
+            "tails": [
+              5,
+              0
+            ]
+          },
+          {
+            "weekday": 4,
+            "tails": [
+              1,
+              6
+            ]
+          },
+          {
+            "weekday": 5,
+            "tails": [
+              2,
+              7
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mini-p5",
+        "name": "2026.3.30-2026.6.28 限行方案",
+        "startDate": "2026-03-30",
+        "endDate": "2026-06-28",
+        "peakStart": "07:00",
+        "peakEnd": "20:00",
+        "rules": [
+          {
+            "weekday": 1,
+            "tails": [
+              2,
+              7
+            ]
+          },
+          {
+            "weekday": 2,
+            "tails": [
+              3,
+              8
+            ]
+          },
+          {
+            "weekday": 3,
+            "tails": [
+              4,
+              9
+            ]
+          },
+          {
+            "weekday": 4,
+            "tails": [
+              5,
+              0
+            ]
+          },
+          {
+            "weekday": 5,
+            "tails": [
+              1,
+              6
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mini-p6",
+        "name": "2026.6.29-2026.9.27 限行方案",
+        "startDate": "2026-06-29",
+        "endDate": "2026-09-27",
+        "peakStart": "07:00",
+        "peakEnd": "20:00",
+        "rules": [
+          {
+            "weekday": 1,
+            "tails": [
+              1,
+              6
+            ]
+          },
+          {
+            "weekday": 2,
+            "tails": [
+              2,
+              7
+            ]
+          },
+          {
+            "weekday": 3,
+            "tails": [
+              3,
+              8
+            ]
+          },
+          {
+            "weekday": 4,
+            "tails": [
+              4,
+              9
+            ]
+          },
+          {
+            "weekday": 5,
+            "tails": [
+              5,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mini-p7",
+        "name": "2026.9.28-2026.12.27 限行方案",
+        "startDate": "2026-09-28",
+        "endDate": "2026-12-27",
+        "peakStart": "07:00",
+        "peakEnd": "20:00",
+        "rules": [
+          {
+            "weekday": 1,
+            "tails": [
+              5,
+              0
+            ]
+          },
+          {
+            "weekday": 2,
+            "tails": [
+              1,
+              6
+            ]
+          },
+          {
+            "weekday": 3,
+            "tails": [
+              2,
+              7
+            ]
+          },
+          {
+            "weekday": 4,
+            "tails": [
+              3,
+              8
+            ]
+          },
+          {
+            "weekday": 5,
+            "tails": [
+              4,
+              9
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mini-p8",
+        "name": "2026.12.28-2027.3.28 限行方案",
+        "startDate": "2026-12-28",
+        "endDate": "2027-03-28",
+        "peakStart": "07:00",
+        "peakEnd": "20:00",
+        "rules": [
+          {
+            "weekday": 1,
+            "tails": [
+              4,
+              9
+            ]
+          },
+          {
+            "weekday": 2,
+            "tails": [
+              5,
+              0
+            ]
+          },
+          {
+            "weekday": 3,
+            "tails": [
+              1,
+              6
+            ]
+          },
+          {
+            "weekday": 4,
+            "tails": [
+              2,
+              7
+            ]
+          },
+          {
+            "weekday": 5,
+            "tails": [
+              3,
+              8
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "settings": {
+    "adminPassword": "admin123",
+    "siteName": "车辆预约系统"
+  }
+}
