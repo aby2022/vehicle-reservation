@@ -35,23 +35,41 @@
 
   async function persist(message) {
     const c = conf();
-    const body = {
+    // 每次写回前先拉取最新 sha：避免本地缓存的 sha 过期导致 Gitee 返回 400(Blob SHA does not match)
+    try {
+      const head = await fetch(`${API}/repos/${c.owner}/${c.repo}/contents/${encodeURIComponent(c.path)}?ref=${c.branch}`, { headers: { 'Authorization': 'token ' + c.pat } });
+      if (head.ok) {
+        const hj = await head.json();
+        _sha = hj.sha;
+        if (!_cache) _cache = JSON.parse(b64decode(hj.content));
+      } else if (head.status === 404) {
+        _sha = null;
+        if (!_cache) _cache = defaultData();
+      }
+    } catch (e) { /* 网络异常时仍尝试用本地 _sha */ }
+
+    const buildBody = () => ({
       message: message || 'update data.json',
       content: b64encode(JSON.stringify(_cache, null, 2)),
-      branch: c.branch
-    };
-    if (_sha) body.sha = _sha;
-    let res = await giteePut(body);
-    if (res.status === 409) {
-      // sha 过期（并发写），重新拉取后重试一次
+      branch: c.branch,
+      ...(_sha ? { sha: _sha } : {})
+    });
+
+    let res = await giteePut(buildBody());
+    // Gitee 在 sha 不匹配/缺失时返回 400（不是 409），需重新拉取 sha 后重试一次
+    if (res.status === 400 || res.status === 409) {
       const r2 = await fetch(`${API}/repos/${c.owner}/${c.repo}/contents/${encodeURIComponent(c.path)}?ref=${c.branch}`, { headers: { 'Authorization': 'token ' + c.pat } });
-      const j2 = await r2.json();
-      _cache = JSON.parse(b64decode(j2.content));
-      _sha = j2.sha;
-      body.sha = _sha; body.content = b64encode(JSON.stringify(_cache, null, 2));
-      res = await giteePut(body);
+      if (r2.ok) {
+        const j2 = await r2.json();
+        _sha = j2.sha;
+        res = await giteePut(buildBody());
+      }
     }
-    if (!res.ok) throw new Error('Gitee 写入失败 HTTP ' + res.status);
+    if (!res.ok) {
+      let detail = '';
+      try { const ej = await res.json(); detail = ej.message || (ej.messages ? JSON.stringify(ej.messages) : ''); } catch (e) {}
+      throw new Error('Gitee 写入失败 HTTP ' + res.status + (detail ? '：' + detail : ''));
+    }
     const j = await res.json();
     _sha = j.sha;
   }
