@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <title>车辆预约</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ 登录 / 注册 ============ -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-logo">
+      <div class="login-icon">🚗</div>
+      <h1>车辆预约</h1>
+      <p>内部车辆管理系统</p>
+    </div>
+    <div class="login-card">
+      <div class="login-tabs">
+        <button class="login-tab active" data-tab="login">登录</button>
+        <button class="login-tab" data-tab="register">注册</button>
+      </div>
+      <div class="fg">
+        <label class="fg-label">用户名</label>
+        <input id="authUser" class="fg-input" placeholder="输入用户名" autocomplete="username" />
+      </div>
+      <div class="fg">
+        <label class="fg-label">密码</label>
+        <input id="authPwd" class="fg-input" type="password" placeholder="输入密码" autocomplete="current-password" />
+      </div>
+      <div class="fg" id="regNameWrap" style="display:none">
+        <label class="fg-label">显示名称（选填）</label>
+        <input id="authName" class="fg-input" placeholder="如：张三" />
+      </div>
+      <button id="authSubmit" class="btn-login">登 录</button>
+      <div id="authErr" class="err-msg"></div>
+      <p class="login-hint">首次使用请切换到「注册」，第一个注册账号自动成为管理员。</p>
+    </div>
+  </div>
+
+  <!-- ============ 主应用 ============ -->
+  <div id="mainApp" class="app-shell hidden">
+
+    <!-- 侧边栏（桌面） -->
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-ico">🚗</span> 车辆预约</div>
+      <nav class="side-nav">
+        <button class="nav-item active" data-view="calendar"><span>📅</span> 日历</button>
+        <button class="nav-item" data-view="booking"><span>📝</span> 预约</button>
+        <button class="nav-item" data-view="records"><span>📋</span> 记录</button>
+        <button class="nav-item" data-view="mine"><span>👤</span> 我的</button>
+      </nav>
+      <div class="side-user">
+        <div class="su-name" id="sideName">—</div>
+        <div class="su-role" id="sideRole">—</div>
+        <button id="sideLogout" class="su-logout">退出登录</button>
+      </div>
+    </aside>
+
+    <!-- 内容区 -->
+    <main class="content">
+      <!-- 日历 -->
+      <section id="view-calendar" class="view">
+        <div id="rbar" class="rbar"></div>
+        <div class="cal-panel">
+          <div class="cal-wrap">
+            <div class="cal-fixed">
+              <div class="cf-hd">车辆</div>
+              <div id="calFixed"></div>
+            </div>
+            <div class="cal-scroll">
+              <div id="calHead" class="cal-row-hd"></div>
+              <div id="calRows"></div>
+            </div>
+          </div>
+          <div id="legend" class="legend"></div>
+        </div>
+        <div id="calDetail" class="detail-bar"></div>
+      </section>
+
+      <!-- 预约 -->
+      <section id="view-booking" class="view hidden">
+        <div id="bookingView"></div>
+      </section>
+
+      <!-- 记录 -->
+      <section id="view-records" class="view hidden">
+        <div class="rec-topbar">
+          <div id="recFilters" class="rec-fl"></div>
+          <button id="recExport" class="rec-export">📥 导出</button>
+        </div>
+        <div id="recList"></div>
+      </section>
+
+      <!-- 我的 -->
+      <section id="view-mine" class="view hidden">
+        <div id="mineView"></div>
+      </section>
+    </main>
+
+    <!-- 底部标签栏（移动端） -->
+    <nav class="tabbar">
+      <button class="tab-btn active" data-view="calendar"><span>📅</span>日历</button>
+      <button class="tab-btn" data-view="booking"><span>📝</span>预约</button>
+      <button class="tab-btn" data-view="records"><span>📋</span>记录</button>
+      <button class="tab-btn" data-view="mine"><span>👤</span>我的</button>
+    </nav>
+
+    <!-- 桌面/手机视图切换 -->
+    <button id="deviceToggle" class="device-toggle">📱 手机视图</button>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toast" class="toast-mask hidden"><div class="toast"></div></div>
+  <footer class="site-footer">© 车辆预约系统</footer>
+</div>
+<script src="amap-config.js"></script>
+<script src="gitee-config.js"></script>
+<script src="gitee-storage.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
