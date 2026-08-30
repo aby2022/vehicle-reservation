@@ -4,7 +4,8 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const WD = ['日', '一', '二', '三', '四', '五', '六'];
-const EVENT_TYPES = ['开会', '验收', '外勤', '接待', '送机', '接机', '其它'];
+const EVENT_TYPES = ['开会', '验收', '放孔', '查管线', '核实测图', '管线对接', '自定义填写'];
+const CUSTOM_EVENT = '自定义填写';
 
 /* ---------- 日期/工具 ---------- */
 function fmt(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -99,7 +100,7 @@ const state = {
   vehicles: [], reservations: [], restriction: null,
   view: 'calendar',
   calDates: [], calSelDate: todayStr(), calSelVehicleId: null,
-  bk: { selVehicleId: null, selDate: null, startTime: '09:00', endTime: '12:00', userPerson: '', eventType: '', purpose: '', note: '', destLng: null, destLat: null, destAddress: '' },
+  bk: { selVehicleId: null, selDate: null, startTime: '09:00', endTime: '12:00', userPerson: '', eventType: '', customEvent: '', purpose: '', note: '', destLng: null, destLat: null, destAddress: '' },
   recFilter: 'all',
   mineTab: 'vehicles', users: []
 };
@@ -349,6 +350,7 @@ function saveBookingForm(scope) {
   if (g('bkEvent')) bk.eventType = g('bkEvent').value;
   if (g('bkDest')) bk.destAddress = g('bkDest').value.trim();
   if (g('bkNote')) bk.note = g('bkNote').value.trim();
+  if (g('bkCustom')) bk.customEvent = g('bkCustom').value.trim();
 }
 // 当日已有预约（让用户看到已占用时段，对齐小程序 dayModalBookings）
 function dayBooksHTML(vid, ds) {
@@ -392,7 +394,8 @@ function openBookingModal(vehicleId, dateStr) {
       <div class="fg"><label class="fg-label">使用时间</label>
         <div class="time-row"><input type="time" id="bkStart" class="fg-input" value="${bk.startTime}"><span style="font-weight:700;color:var(--text3)">—</span><input type="time" id="bkEnd" class="fg-input" value="${bk.endTime}"></div></div>
       <div class="fg"><label class="fg-label">使用人</label><input id="bkUser" class="fg-input" placeholder="请输入姓名" value="${escapeHtml(bk.userPerson)}"></div>
-      <div class="fg"><label class="fg-label">事项（选填）</label><select id="bkEvent" class="fg-input"><option value="">如：开会、验收、接机</option>${evOptions}</select></div>
+      <div class="fg"><label class="fg-label">事项（选填）</label><select id="bkEvent" class="fg-input"><option value="">请选择事项</option>${evOptions}</select></div>
+      ${bk.eventType === CUSTOM_EVENT ? `<div class="fg"><label class="fg-label">自定义事项</label><input id="bkCustom" class="fg-input" placeholder="请输入具体事项" value="${escapeHtml(bk.customEvent || '')}"></div>` : ''}
       <div class="fg"><label class="fg-label">目的地（选填）</label>
         <div class="dest-row">
           <input id="bkDest" class="fg-input" placeholder="如：望京SOHO" value="${escapeHtml(bk.destAddress || '')}">
@@ -517,7 +520,9 @@ async function submitBooking() {
   if (!v) { toast('请选择车辆'); return; }
   const per = vehiclePeriodOn(v, bk.selDate);
   if (per && per.type === 'damage') { toast('该车已损坏，不可预约'); return; }
-  const body = { vehicleId: bk.selVehicleId, date: bk.selDate, allDay: false, startTime: bk.startTime, endTime: bk.endTime, applicant: bk.userPerson, purpose: bk.eventType, destination: bk.destAddress, notes: bk.note, destLng: bk.destLng, destLat: bk.destLat, destAddress: bk.destAddress };
+  if (bk.eventType === CUSTOM_EVENT && !bk.customEvent) { toast('请填写自定义事项'); return; }
+  const finalEvent = bk.eventType === CUSTOM_EVENT ? bk.customEvent : bk.eventType;
+  const body = { vehicleId: bk.selVehicleId, date: bk.selDate, allDay: false, startTime: bk.startTime, endTime: bk.endTime, applicant: bk.userPerson, purpose: finalEvent, destination: bk.destAddress, notes: bk.note, destLng: bk.destLng, destLat: bk.destLat, destAddress: bk.destAddress };
   const restricted = isRestrictedForBooking(bk.selDate, v.plate, bk.startTime, bk.endTime);
   const conflict = hasConflict(bk.selVehicleId, bk.selDate, bk.startTime, bk.endTime);
   if (restricted && !confirm(`⚠️ 限行提醒\n${v.plate} 在 ${bk.selDate} 限行。\n确认仍要预约吗？`)) return;
@@ -526,7 +531,7 @@ async function submitBooking() {
   if (r.ok) {
     toast('预约成功');
     const keepDate = bk.selDate, keepVid = bk.selVehicleId;
-    state.bk = { selVehicleId: null, selDate: null, startTime: '09:00', endTime: '12:00', userPerson: '', eventType: '', purpose: '', note: '', destLng: null, destLat: null, destAddress: '' };
+    state.bk = { selVehicleId: null, selDate: null, startTime: '09:00', endTime: '12:00', userPerson: '', eventType: '', customEvent: '', purpose: '', note: '', destLng: null, destLat: null, destAddress: '' };
     closeModal();
     state.calSelDate = keepDate; state.calSelVehicleId = keepVid;
     await reload();
@@ -558,7 +563,9 @@ function renderRecords() {
     const items = groups[ym].map(r => {
       const v = state.vehicles.find(x => x.id === r.vehicleId);
       const canCancel = (r.status === 'pending' || r.status === 'active') && (state.user.role === 'admin' || r.createdBy === state.user.userId);
-      const lines = [`🕐 ${r.startTime || ''}-${r.endTime || ''}`, `预约 <b>${r.createdName || '?'}</b>`, `使用 <b>${r.applicant || '?'}</b>`];
+      const rd = r.date ? parseDS(r.date) : null;
+      const lines = [rd ? `📅 ${rd.getMonth() + 1}月${rd.getDate()}日 周${WD[rd.getDay()]}` : '',
+        `🕐 ${r.startTime || ''}-${r.endTime || ''}`, `预约 <b>${r.createdName || '?'}</b>`, `使用 <b>${r.applicant || '?'}</b>`].filter(Boolean);
       const dl = destLink(r); if (dl) lines.push(dl);
       if (r.purpose) lines.push(`事项 ${r.purpose}`);
       return `<div class="rec"><div class="rec-top"><span class="rec-plate">${v ? v.plate : '?'}</span><span class="rec-status ${r.status}">${REC_STATUS[r.status] || r.status}</span></div>
@@ -596,7 +603,10 @@ async function renderMine() {
   if (state.mineTab === 'vehicles') body = renderVehiclesTab();
   else if (state.mineTab === 'people') body = renderPeopleTab();
   else body = renderRestrictionsTab();
-  root.innerHTML = tabs + body;
+  // 管理员同样需要账户入口（手机端无侧边栏，否则看不到退出登录）
+  root.innerHTML = tabs + body + `
+      <div class="account-card"><div class="ac-name">${escapeHtml(state.user.displayName || state.user.username)}</div><div class="ac-sub">${escapeHtml(state.user.username)} · 管理员</div></div>
+      <div class="account-actions"><span id="pwdChange">修改密码</span><span class="danger" id="mineLogout">退出登录</span></div>`;
 }
 function renderVehiclesTab() {
   const cards = state.vehicles.map(v => {
