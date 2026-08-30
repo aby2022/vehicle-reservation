@@ -296,9 +296,24 @@ function legendHTML() {
   ];
   return items.map(([bg, c, t]) => `<div class="legend-item"><span class="legend-dot" style="background:${bg};border:1px solid ${c}"></span><span>${t}</span></div>`).join('');
 }
+// 限行规则到期提醒：临期 7 天内或已过期时提示补充新一期规则
+function restrictionExpiryAlert() {
+  const rs = state.restriction;
+  if (!rs || !rs.enabled) return '';
+  const periods = rs.periods || [];
+  if (!periods.length) return '';
+  const ends = periods.map(p => p.endDate).filter(Boolean).sort();
+  const last = ends[ends.length - 1];
+  if (!last) return '';
+  const t = todayObj(), e = parseDS(last);
+  const days = Math.round((e - t) / 86400000);
+  if (days > 7) return '';
+  if (days < 0) return `<div class="alert alert-e">⚠️ 限行规则已于 ${last} 到期，此后日期将不再提示限行。请到「我的 → 限行规则」补充新一期规则。</div>`;
+  return `<div class="alert alert-w">⚠️ 限行规则将于 ${last} 到期（还有 ${days} 天），到期后不再提示限行。请及时到「我的 → 限行规则」补充新一期规则。</div>`;
+}
 function renderCalendar() {
   const ds = state.calSelDate || todayStr();
-  $('#rbar').innerHTML = bannerHTML();
+  $('#rbar').innerHTML = bannerHTML() + restrictionExpiryAlert();
   $('#calFixed').innerHTML = state.vehicles.map(v => {
     const st = vehicleStatus(v, ds);
     return `<div class="cf-row" data-vid="${v.id}"><span class="cf-plate">${v.plate}</span><span class="cf-meta">尾号${lastDig(v.plate)} · <span style="color:${st.cls === 'damage' ? '#6b7280' : st.cls === 'normal' ? 'var(--ok)' : 'var(--err)'};font-weight:700">${st.text}</span></span></div>`;
@@ -663,7 +678,7 @@ function renderRestrictionsTab() {
       <div style="font-size:11px;color:var(--text2);margin-top:4px">${rules}</div>
       <div style="font-size:11px;color:var(--warn);margin-top:4px">${peak}</div></div>`;
   }).join('');
-  return `<button class="mg-add" id="addRule">+ 添加限行方案</button>${cards || '<div class="empty-state">暂无限行方案</div>'}`;
+  return restrictionExpiryAlert() + `<button class="mg-add" id="addRule">+ 添加限行方案</button>${cards || '<div class="empty-state">暂无限行方案</div>'}`;
 }
 
 /* ---------- 我的：弹窗操作 ---------- */
