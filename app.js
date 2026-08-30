@@ -564,14 +564,15 @@ function applyRecFilter(list) {
   if (state.recVehicle) out = out.filter(r => r.vehicleId === state.recVehicle);
   const f = state.recFilter;
   if (f === 'today') return out.filter(r => r.date === today);
-  if (f === 'upcoming') return out.filter(r => r.date >= today && r.status !== 'cancelled');
-  if (f === 'completed') return out.filter(r => recStatusOf(r) === 'completed' || r.status === 'cancelled');
+  if (f === 'upcoming') return out.filter(r => r.date >= today && recStatusOf(r) === 'pending');
+  if (f === 'completed') return out.filter(r => recStatusOf(r) === 'completed');
+  if (f === 'cancelled') return out.filter(r => r.status === 'cancelled');
   if (f === 'mine') return out.filter(r => (u && r.createdBy && r.createdBy === u.userId)
     || (u && r.createdName && r.createdName === (u.displayName || u.username)));
   return out;
 }
 function renderRecords() {
-  const filters = [['all', '全部'], ['mine', '我的预约'], ['upcoming', '即将出行'], ['today', '今日'], ['completed', '已完成']];
+  const filters = [['all', '全部'], ['mine', '我的预约'], ['upcoming', '即将出行'], ['today', '今日'], ['completed', '已完成'], ['cancelled', '已取消']];
   $('#recFilters').innerHTML = filters.map(([k, l]) => `<div class="fc ${state.recFilter === k ? 'active' : ''}" data-key="${k}">${l}</div>`).join('');
   const vsel = $('#recVehicleSel');
   if (vsel) vsel.innerHTML = `<option value="">全部车辆</option>` + state.vehicles.map(v => `<option value="${v.id}" ${state.recVehicle === v.id ? 'selected' : ''}>${escapeHtml(v.plate)}</option>`).join('');
