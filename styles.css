@@ -319,3 +319,5 @@ input, select, textarea { font-family: inherit; }
 /* 过去日期：灰色只读，不出现预约按钮 */
 .detail-row.past { opacity: .72; }
 .detail-row.past .detail-plate { color: var(--text3); }
+/* 记录页车辆筛选 */
+.rec-vsel { border: 1px solid var(--border); background: var(--surface); color: var(--text2); border-radius: 8px; padding: 6px 8px; font-size: 12px; font-weight: 700; max-width: 132px; }
