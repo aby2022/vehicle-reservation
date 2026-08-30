@@ -593,7 +593,7 @@ function renderRecords() {
         `🕐 ${r.startTime || ''}-${r.endTime || ''}`, `预约 <b>${escapeHtml(r.createdName || r.applicant || '—')}</b>`, `使用 <b>${escapeHtml(r.applicant || '?')}</b>`].filter(Boolean);
       const dl = destLink(r); if (dl) lines.push(dl);
       if (r.purpose) lines.push(`事项 ${r.purpose}`);
-      return `<div class="rec"><div class="rec-top"><span class="rec-plate">${v ? escapeHtml(v.plate) : '?'}</span><span class="rec-status ${stKey}">${REC_STATUS[stKey]}</span></div>
+      return `<div class="rec"><div class="rec-top"><span class="rec-plate">${v ? escapeHtml(v.plate) : '<span style="color:var(--text3)">已删除</span>'}</span><span class="rec-status ${stKey}">${REC_STATUS[stKey]}</span></div>
         <div class="rec-body">${lines.map(l => `<span>${l}</span>`).join('')}</div>
         ${canCancel ? `<span class="rec-cancel" data-id="${r.id}">取消预约</span>` : ''}</div>`;
     }).join('');
@@ -604,7 +604,7 @@ function renderRecords() {
 function exportCSV() {
   const list = applyRecFilter(state.reservations.slice()).sort((a, b) => (a.date + (a.startTime || '')).localeCompare(b.date + (b.startTime || '')));
   const head = ['日期', '开始', '结束', '车牌', '使用人', '预约人', '事项', '目的地', '状态'];
-  const rows = list.map(r => { const v = state.vehicles.find(x => x.id === r.vehicleId); const stKey = recStatusOf(r); return [r.date, r.startTime, r.endTime, v ? v.plate : '', r.applicant, r.createdName || '', r.purpose, r.destination, REC_STATUS[stKey]]; });
+  const rows = list.map(r => { const v = state.vehicles.find(x => x.id === r.vehicleId); const stKey = recStatusOf(r); return [r.date, r.startTime, r.endTime, v ? v.plate : '（已删除）', r.applicant, r.createdName || '', r.purpose, r.destination, REC_STATUS[stKey]]; });
   const csv = '﻿' + [head].concat(rows).map(row => row.map(c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '车辆预约记录.csv'; a.click();
@@ -822,13 +822,27 @@ function bindEvents() {
     const t = e.target.closest('.mg-tab'); if (t) { state.mineTab = t.dataset.tab; renderMine(); return; }
     if (e.target.id === 'addVehicle') return openVehicleModal();
     const ev = e.target.closest('[data-edit]'); if (ev) return openVehicleModal(state.vehicles.find(v => v.id === ev.dataset.edit));
-    const dv = e.target.closest('[data-del]'); if (dv) { if (confirm('确定删除该车辆？')) api('/vehicles/' + dv.dataset.del, { method: 'DELETE' }).then(async () => { toast('已删除'); await reload(); }); return; }
+    const dv = e.target.closest('[data-del]'); if (dv) {
+      const n = state.reservations.filter(r => r.vehicleId === dv.dataset.del).length;
+      const plate = (state.vehicles.find(x => x.id === dv.dataset.del) || {}).plate || '该车辆';
+      const msg = n > 0
+        ? `⚠️ ${plate} 有 ${n} 条预约记录。\n删除后这些记录的车牌将显示为「已删除」，历史数据仍保留。\n\n确定删除吗？`
+        : '确定删除该车辆？';
+      if (confirm(msg)) api('/vehicles/' + dv.dataset.del, { method: 'DELETE' }).then(async () => { toast('已删除'); await reload(); });
+      return;
+    }
     const pv = e.target.closest('[data-pvid]'); if (pv) return openPeriodModal(pv.dataset.pvid);
     const pd = e.target.closest('.v-per-del'); if (pd) { if (confirm('删除此状态记录？')) api('/vehicles/' + pd.dataset.vid + '/periods/' + pd.dataset.pid, { method: 'DELETE' }).then(async () => { toast('已删除'); await reload(); }); return; }
     if (e.target.id === 'addPerson') return openPersonModal();
     const du = e.target.closest('[data-deluser]'); if (du) {
       if (du.dataset.role === 'admin' && state.users.filter(u => u.role === 'admin').length <= 1) { toast('至少保留一位管理员'); return; }
-      if (confirm('确定删除该用户？')) api('/admin/users/' + du.dataset.deluser, { method: 'DELETE' }).then(async () => { toast('已删除'); state.users = []; await reload(); });
+      const uid = du.dataset.deluser;
+      const uname = (state.users.find(u => u.id === uid) || {}).username || uid;
+      const n = state.reservations.filter(r => r.createdBy === uid || r.createdName === uname).length;
+      const msg = n > 0
+        ? `⚠️ ${uname} 创建过 ${n} 条预约记录。\n删除账号后这些记录仍保留其姓名，历史可追溯。\n\n确定删除吗？`
+        : '确定删除该用户？';
+      if (confirm(msg)) api('/admin/users/' + uid, { method: 'DELETE' }).then(async () => { toast('已删除'); state.users = []; await reload(); });
       return;
     }
     if (e.target.id === 'addRule') return openRuleModal();
