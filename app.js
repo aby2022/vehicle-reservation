@@ -101,7 +101,7 @@ const state = {
   view: 'calendar',
   calDates: [], calSelDate: todayStr(), calSelVehicleId: null,
   bk: { selVehicleId: null, selDate: null, startTime: '09:00', endTime: '12:00', userPerson: '', eventType: '', customEvent: '', purpose: '', note: '', destLng: null, destLat: null, destAddress: '' },
-  recFilter: 'all',
+  recFilter: 'all', recVehicle: '',
   mineTab: 'vehicles', users: []
 };
 
@@ -221,6 +221,7 @@ async function reload() {
   if (v.ok) state.vehicles = v.data;
   if (r.ok) state.reservations = r.data;
   if (rs.ok) state.restriction = rs.data;
+  state.calDates = buildCalDates();   // 跨天使用时刷新日期轴与「今天」标记
   renderCurrent();
 }
 function buildCalDates() {
@@ -420,6 +421,7 @@ function openBookingModal(vehicleId, dateStr) {
     const rerender = () => { saveBookingForm(sheet); openBookingModal(bk.selVehicleId, bk.selDate); };
     const vs = g('bkVehicle'); if (vs) vs.onchange = rerender;
     const dsSel = g('bkDate'); if (dsSel) dsSel.onchange = rerender;
+    const evSel = g('bkEvent'); if (evSel) evSel.onchange = rerender;   // 选「自定义填写」时刷新出输入框
     const us = g('bkUser');
     if (us) us.oninput = () => { bk.userPerson = us.value.trim(); const sb = g('bkSubmit'); if (sb) sb.disabled = !(bk.selVehicleId && bk.selDate && bk.userPerson); };
     const mp = g('bkMapPick');
@@ -550,18 +552,29 @@ async function submitBooking() {
 
 /* ================= 记录 ================= */
 const REC_STATUS = { pending: '待使用', active: '使用中', completed: '已完成', cancelled: '已取消' };
+// 实际状态：数据里没有自动流转，「过期且未取消」的预约按「已完成」处理（显示层推断，不写数据）
+function recStatusOf(r) {
+  if (r.status === 'cancelled') return 'cancelled';
+  if (r.status === 'completed' || r.status === 'active') return r.status;
+  return (r.date && r.date < todayStr()) ? 'completed' : 'pending';
+}
 function applyRecFilter(list) {
   const today = todayStr(); const u = state.user;
-  let f = state.recFilter;
-  if (f === 'today') return list.filter(r => r.date === today);
-  if (f === 'upcoming') return list.filter(r => r.date >= today && r.status !== 'cancelled');
-  if (f === 'completed') return list.filter(r => r.status === 'completed' || r.status === 'cancelled' || r.date < today);
-  if (f === 'mine') return list.filter(r => r.createdBy === u.userId || r.applicant === u.displayName);
-  return list;
+  let out = list;
+  if (state.recVehicle) out = out.filter(r => r.vehicleId === state.recVehicle);
+  const f = state.recFilter;
+  if (f === 'today') return out.filter(r => r.date === today);
+  if (f === 'upcoming') return out.filter(r => r.date >= today && r.status !== 'cancelled');
+  if (f === 'completed') return out.filter(r => recStatusOf(r) === 'completed' || r.status === 'cancelled');
+  if (f === 'mine') return out.filter(r => (u && r.createdBy && r.createdBy === u.userId)
+    || (u && r.createdName && r.createdName === (u.displayName || u.username)));
+  return out;
 }
 function renderRecords() {
   const filters = [['all', '全部'], ['mine', '我的预约'], ['upcoming', '即将出行'], ['today', '今日'], ['completed', '已完成']];
   $('#recFilters').innerHTML = filters.map(([k, l]) => `<div class="fc ${state.recFilter === k ? 'active' : ''}" data-key="${k}">${l}</div>`).join('');
+  const vsel = $('#recVehicleSel');
+  if (vsel) vsel.innerHTML = `<option value="">全部车辆</option>` + state.vehicles.map(v => `<option value="${v.id}" ${state.recVehicle === v.id ? 'selected' : ''}>${escapeHtml(v.plate)}</option>`).join('');
   let list = applyRecFilter(state.reservations.slice()).sort((a, b) => (b.date + (b.startTime || '')).localeCompare(a.date + (a.startTime || '')));
   if (!list.length) { $('#recList').innerHTML = `<div class="empty-state">暂无记录</div>`; return; }
   const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
@@ -571,13 +584,15 @@ function renderRecords() {
     const [y, m] = ym.split('-');
     const items = groups[ym].map(r => {
       const v = state.vehicles.find(x => x.id === r.vehicleId);
-      const canCancel = (r.status === 'pending' || r.status === 'active') && (state.user.role === 'admin' || r.createdBy === state.user.userId);
+      const stKey = recStatusOf(r);
+      // 只有「今天及以后」的待使用预约才可取消（已过期/已取消/已完成一律不可操作）
+      const canCancel = stKey === 'pending' && (state.user.role === 'admin' || r.createdBy === state.user.userId);
       const rd = r.date ? parseDS(r.date) : null;
       const lines = [rd ? `📅 ${rd.getMonth() + 1}月${rd.getDate()}日 周${WD[rd.getDay()]}` : '',
         `🕐 ${r.startTime || ''}-${r.endTime || ''}`, `预约 <b>${escapeHtml(r.createdName || r.applicant || '—')}</b>`, `使用 <b>${escapeHtml(r.applicant || '?')}</b>`].filter(Boolean);
       const dl = destLink(r); if (dl) lines.push(dl);
       if (r.purpose) lines.push(`事项 ${r.purpose}`);
-      return `<div class="rec"><div class="rec-top"><span class="rec-plate">${v ? v.plate : '?'}</span><span class="rec-status ${r.status}">${REC_STATUS[r.status] || r.status}</span></div>
+      return `<div class="rec"><div class="rec-top"><span class="rec-plate">${v ? escapeHtml(v.plate) : '?'}</span><span class="rec-status ${stKey}">${REC_STATUS[stKey]}</span></div>
         <div class="rec-body">${lines.map(l => `<span>${l}</span>`).join('')}</div>
         ${canCancel ? `<span class="rec-cancel" data-id="${r.id}">取消预约</span>` : ''}</div>`;
     }).join('');
@@ -588,7 +603,7 @@ function renderRecords() {
 function exportCSV() {
   const list = applyRecFilter(state.reservations.slice()).sort((a, b) => (a.date + (a.startTime || '')).localeCompare(b.date + (b.startTime || '')));
   const head = ['日期', '开始', '结束', '车牌', '使用人', '预约人', '事项', '目的地', '状态'];
-  const rows = list.map(r => { const v = state.vehicles.find(x => x.id === r.vehicleId); return [r.date, r.startTime, r.endTime, v ? v.plate : '', r.applicant, r.createdName, r.purpose, r.destination, REC_STATUS[r.status] || r.status]; });
+  const rows = list.map(r => { const v = state.vehicles.find(x => x.id === r.vehicleId); const stKey = recStatusOf(r); return [r.date, r.startTime, r.endTime, v ? v.plate : '', r.applicant, r.createdName || '', r.purpose, r.destination, REC_STATUS[stKey]]; });
   const csv = '﻿' + [head].concat(rows).map(row => row.map(c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '车辆预约记录.csv'; a.click();
@@ -794,6 +809,7 @@ function bindEvents() {
 
   // 记录
   $('#recFilters').addEventListener('click', e => { const f = e.target.closest('.fc'); if (f) { state.recFilter = f.dataset.key; renderRecords(); } });
+  const rvs = $('#recVehicleSel'); if (rvs) rvs.addEventListener('change', () => { state.recVehicle = rvs.value; renderRecords(); });
   $('#recList').addEventListener('click', e => {
     const c = e.target.closest('.rec-cancel'); if (c) { cancelRes(c.dataset.id); return; }
     const g = e.target.closest('.rec-grp-hd'); if (g) { g.classList.toggle('folded'); const b = g.nextElementSibling; if (b) b.classList.toggle('folded'); }
