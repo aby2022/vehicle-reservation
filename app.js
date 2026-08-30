@@ -282,8 +282,12 @@ function cellInfo(v, ds) {
     else cls = rest ? 'restricted-free' : 'warning';
     return { cls, txt };
   }
-  // 已过去
-  if (isPast) return { cls: 'past', txt: books.length ? names : '—' };
+  // 已过去：信息量与未来日期保持一致（有预约显示使用人，无预约显示「已过」），
+  // 但统一灰色、只读——详情栏可看明细，不出现「预约此车」
+  if (isPast) {
+    if (books.length) return { cls: 'past', txt: rest ? names + '<br>限' : names };
+    return { cls: 'past', txt: '已过' };
+  }
   // 未来（含今天）
   if (books.length) return { cls: rest ? 'restricted-booked' : 'booked', txt: rest ? names + '<br>限' : names };
   return { cls: rest ? 'restricted-free' : 'free', txt: rest ? '限行' : '可约' };
