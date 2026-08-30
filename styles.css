@@ -315,3 +315,7 @@ input, select, textarea { font-family: inherit; }
 .db-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--text2); padding: 3px 0; }
 .db-time { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .db-user { font-weight: 700; color: var(--brand); }
+.db-by { font-size: 11px; color: var(--text3); }
+/* 过去日期：灰色只读，不出现预约按钮 */
+.detail-row.past { opacity: .72; }
+.detail-row.past .detail-plate { color: var(--text3); }
