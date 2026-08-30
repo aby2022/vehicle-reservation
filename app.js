@@ -224,8 +224,8 @@ async function reload() {
   renderCurrent();
 }
 function buildCalDates() {
-  const out = []; const base = todayObj(); base.setDate(base.getDate() - 14);
-  for (let i = 0; i < 28; i++) {
+  const out = []; const base = todayObj(); base.setDate(base.getDate() - 21);
+  for (let i = 0; i < 42; i++) {
     const d = new Date(base); d.setDate(base.getDate() + i);
     out.push({ ds: fmt(d), m: d.getMonth() + 1, d: d.getDate(), today: fmt(d) === todayStr(), label: wkLabel(d) });
   }
@@ -309,6 +309,13 @@ function renderCalendar() {
   }).join('') + `</div>`).join('');
   $('#legend').innerHTML = legendHTML();
   renderDetail();
+  if (!state._calScrolled && state.calDates.length) { state._calScrolled = true; scrollCalToToday(); }
+}
+// 首次进入把日历横向滚动到「今天」，否则默认停在最早的日期
+function scrollCalToToday() {
+  const sc = $('.cal-scroll'); if (!sc) return;
+  const idx = state.calDates.findIndex(d => d.today);
+  if (idx >= 0) sc.scrollLeft = Math.max(0, idx * 64 - 80);
 }
 function renderDetail() {
   const ds = state.calSelDate; const box = $('#calDetail');
@@ -326,12 +333,13 @@ function renderDetail() {
     else if (['booked', 'restricted-booked', 'warning-booked', 'past'].includes(c.cls)) {
       const books = state.reservations.filter(r => r.vehicleId === v.id && r.date === ds && r.status !== 'cancelled');
       if (books.length) {
-        infoHtml = books.map(b => `🕐 ${b.startTime || ''}-${b.endTime || ''} 👤 <b>${b.applicant || '?'}</b> ${destLink(b)}`).join('<br>');
+        infoHtml = books.map(b => `🕐 ${b.startTime || ''}-${b.endTime || ''} 👤 <b>${escapeHtml(b.applicant || '?')}</b> · 预约 <b>${escapeHtml(b.createdName || b.applicant || '—')}</b>${b.purpose ? ` · ${escapeHtml(b.purpose)}` : ''} ${destLink(b)}`).join('<br>');
         freeText = '';
       } else { freeText = ds < todayStr() ? '无人预约' : '可预约'; freeColor = 'var(--text3)'; }
     } else { freeText = rest ? '限行 · 7:00-20:00 五环内' : '可预约'; freeColor = rest ? 'var(--err)' : 'var(--ok)'; }
+    if (c.cls === 'past') canBook = false;   // 过去日期只读：不出现「预约此车」
     const isSel = v.id === state.calSelVehicleId;
-    return `<div class="detail-row ${isSel ? 'detail-sel' : ''}"><span class="detail-plate">${v.plate}</span><div class="detail-info">${infoHtml || `<span class="detail-free" style="color:${freeColor}">${freeText}</span>`}</div>${canBook ? `<button class="detail-go" data-vid="${v.id}" data-ds="${ds}">预约此车 →</button>` : ''}</div>`;
+    return `<div class="detail-row ${isSel ? 'detail-sel' : ''} ${c.cls === 'past' ? 'past' : ''}"><span class="detail-plate">${v.plate}</span><div class="detail-info">${infoHtml || `<span class="detail-free" style="color:${freeColor}">${freeText}</span>`}</div>${canBook ? `<button class="detail-go" data-vid="${v.id}" data-ds="${ds}">预约此车 →</button>` : ''}</div>`;
   }).join('');
   box.innerHTML = `<div class="detail-hd"><span class="detail-date">${d.getMonth() + 1}月${d.getDate()}日 ${WD[d.getDay()]}</span></div>${rows}`;
 }
@@ -356,14 +364,14 @@ function saveBookingForm(scope) {
 function dayBooksHTML(vid, ds) {
   const list = state.reservations.filter(r => r.vehicleId === vid && r.date === ds && r.status !== 'cancelled');
   if (!list.length) return '';
-  const items = list.map(r => `<div class="db-item"><span class="db-time">${r.startTime || '?'}-${r.endTime || '?'}</span><span class="db-user">${escapeHtml(r.applicant || '?')}</span>${destLink(r)}</div>`).join('');
+  const items = list.map(r => `<div class="db-item"><span class="db-time">${r.startTime || '?'}-${r.endTime || '?'}</span><span class="db-user">${escapeHtml(r.applicant || '?')}</span><span class="db-by">预约 ${escapeHtml(r.createdName || r.applicant || '—')}</span>${destLink(r)}</div>`).join('');
   return `<div class="day-books"><div class="db-hd">当日已有预约</div>${items}</div>`;
 }
 function openBookingModal(vehicleId, dateStr) {
   const bk = state.bk;
   if (vehicleId) bk.selVehicleId = vehicleId;
   if (dateStr) bk.selDate = dateStr;
-  if (!bk.selDate) bk.selDate = todayStr();
+  if (!bk.selDate || bk.selDate < todayStr()) bk.selDate = todayStr();   // 过去日期不允许预约，兜底拉回今天
   if (!bk.startTime) bk.startTime = '09:00';
   if (!bk.endTime) bk.endTime = '12:00';
   if (!bk.userPerson && state.user) bk.userPerson = state.user.displayName || '';
@@ -522,7 +530,8 @@ async function submitBooking() {
   if (per && per.type === 'damage') { toast('该车已损坏，不可预约'); return; }
   if (bk.eventType === CUSTOM_EVENT && !bk.customEvent) { toast('请填写自定义事项'); return; }
   const finalEvent = bk.eventType === CUSTOM_EVENT ? bk.customEvent : bk.eventType;
-  const body = { vehicleId: bk.selVehicleId, date: bk.selDate, allDay: false, startTime: bk.startTime, endTime: bk.endTime, applicant: bk.userPerson, purpose: finalEvent, destination: bk.destAddress, notes: bk.note, destLng: bk.destLng, destLat: bk.destLat, destAddress: bk.destAddress };
+  const me = state.user || {};
+  const body = { vehicleId: bk.selVehicleId, date: bk.selDate, allDay: false, startTime: bk.startTime, endTime: bk.endTime, applicant: bk.userPerson, purpose: finalEvent, destination: bk.destAddress, notes: bk.note, destLng: bk.destLng, destLat: bk.destLat, destAddress: bk.destAddress, createdBy: me.userId || null, createdName: me.displayName || me.username || '' };
   const restricted = isRestrictedForBooking(bk.selDate, v.plate, bk.startTime, bk.endTime);
   const conflict = hasConflict(bk.selVehicleId, bk.selDate, bk.startTime, bk.endTime);
   if (restricted && !confirm(`⚠️ 限行提醒\n${v.plate} 在 ${bk.selDate} 限行。\n确认仍要预约吗？`)) return;
@@ -565,7 +574,7 @@ function renderRecords() {
       const canCancel = (r.status === 'pending' || r.status === 'active') && (state.user.role === 'admin' || r.createdBy === state.user.userId);
       const rd = r.date ? parseDS(r.date) : null;
       const lines = [rd ? `📅 ${rd.getMonth() + 1}月${rd.getDate()}日 周${WD[rd.getDay()]}` : '',
-        `🕐 ${r.startTime || ''}-${r.endTime || ''}`, `预约 <b>${r.createdName || '?'}</b>`, `使用 <b>${r.applicant || '?'}</b>`].filter(Boolean);
+        `🕐 ${r.startTime || ''}-${r.endTime || ''}`, `预约 <b>${escapeHtml(r.createdName || r.applicant || '—')}</b>`, `使用 <b>${escapeHtml(r.applicant || '?')}</b>`].filter(Boolean);
       const dl = destLink(r); if (dl) lines.push(dl);
       if (r.purpose) lines.push(`事项 ${r.purpose}`);
       return `<div class="rec"><div class="rec-top"><span class="rec-plate">${v ? v.plate : '?'}</span><span class="rec-status ${r.status}">${REC_STATUS[r.status] || r.status}</span></div>
