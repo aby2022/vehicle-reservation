@@ -32,6 +32,22 @@
     try { await _loadPromise; } finally { _loadPromise = null; }
   }
 
+  // 本地时区的「今天」（必须与前端 todayStr() 一致；不能用 toISOString，
+  // 否则北京时间 08:00 前会算成前一天，导致当天预约被误判为已过期）
+  function localToday() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  // 归档：「已过期且未取消」的预约标记为 completed。
+  // 只在写入前顺带执行，不额外增加 Gitee 写次数（纯前端架构下写操作越少越安全）。
+  function archiveExpired() {
+    const t = localToday(); let n = 0;
+    (_cache.reservations || []).forEach(r => {
+      if (r.status === 'pending' && r.date && r.date < t) { r.status = 'completed'; n++; }
+    });
+    return n;
+  }
+
   async function persist(message) {
     const c = conf();
     // 安全护栏：本地数据未成功加载（_cache 为 null）时，拒绝写入，
@@ -39,6 +55,7 @@
     if (_cache == null) {
       throw new Error('本地数据尚未加载，已阻止写入以防覆盖 Gitee 数据，请刷新页面后重试');
     }
+    archiveExpired();
     // 每次写回前只刷新 sha（绝不回写内容到 _cache，_cache 已含本地改动）：
     // 避免本地缓存的 sha 过期导致 Gitee 返回 400(Blob SHA does not match)
     try {
