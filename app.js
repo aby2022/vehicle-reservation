@@ -49,11 +49,29 @@ function vehiclePeriodOn(v, dateStr) {
 }
 function vehicleStatus(v, dateStr) {
   const per = vehiclePeriodOn(v, dateStr);
+  const rest = isRestOn(dateStr, v.plate);
   if (per && per.type === 'damage') return { text: '损坏', cls: 'damage' };
-  if (per && per.type === 'repair') return { text: '维修', cls: 'repair' };
-  if (per && per.type === 'maintenance') return { text: '保养', cls: 'maintenance' };
-  if (isRestOn(dateStr, v.plate)) return { text: '限行', cls: 'restricted' };
+  if (per) {
+    const baseText = per.type === 'repair' ? '维修' : per.type === 'maintenance' ? '保养' : '其他';
+    const cls = per.type === 'repair' ? 'repair' : per.type === 'maintenance' ? 'maintenance' : 'other';
+    if (rest) return { text: baseText + '+限行', cls: 'restricted' };
+    return { text: baseText, cls };
+  }
+  if (rest) return { text: '限行', cls: 'restricted' };
   return { text: '正常', cls: 'normal' };
+}
+// 车辆状态提示语（对齐小程序 booking.updateVehicleAlert）
+function vehicleStatusNote(v, dateStr) {
+  const per = vehiclePeriodOn(v, dateStr);
+  const rest = isRestOn(dateStr, v.plate);
+  const st = vehicleStatus(v, dateStr);
+  const desc = st.cls === 'repair' ? '维修中' : st.cls === 'maintenance' ? '保养中'
+    : st.cls === 'other' ? (per && per.note ? '存在异常（' + per.note + '）' : '存在异常') : '';
+  if (st.cls === 'damage') return { type: 'err', msg: '该车已损坏，不可预约' };
+  if (rest && desc) return { type: 'warn', msg: `该车当日限行（7:00-20:00 五环内）且${desc}，仍可预约，请联系管理员核实` };
+  if (rest) return { type: 'warn', msg: '该车当日限行（7:00-20:00），仍可预约，请联系管理员核实' };
+  if (desc) return { type: 'warn', msg: `该车${desc}，仍可预约，请联系管理员核实` };
+  return { type: 'ok', msg: '该车当日状态正常，可预约' };
 }
 // 时段重叠（HH:MM 字符串比较）
 function timeOverlap(aS, aE, bS, bE) { return aS < bE && bS < aE; }
@@ -81,7 +99,6 @@ const state = {
   vehicles: [], reservations: [], restriction: null,
   view: 'calendar',
   calDates: [], calSelDate: todayStr(), calSelVehicleId: null,
-  openBooking: null,
   bk: { selVehicleId: null, selDate: null, startTime: '09:00', endTime: '12:00', userPerson: '', eventType: '', purpose: '', note: '', destLng: null, destLat: null, destAddress: '' },
   recFilter: 'all',
   mineTab: 'vehicles', users: []
@@ -220,19 +237,12 @@ function switchView(view) {
   $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   $$('.view').forEach(s => s.classList.add('hidden'));
-  $('#view-' + view).classList.remove('hidden');
-  if (view === 'booking' && state.openBooking) {
-    state.bk.selVehicleId = state.openBooking.vehicleId || state.bk.selVehicleId;
-    state.bk.selDate = state.openBooking.date || state.bk.selDate;
-    state.openBooking = null;
-  }
-  if (view === 'booking' && !state.bk.userPerson && state.user) state.bk.userPerson = state.user.displayName || '';
+  const sec = $('#view-' + view); if (sec) sec.classList.remove('hidden');
   renderCurrent();
   window.scrollTo(0, 0);
 }
 function renderCurrent() {
   if (state.view === 'calendar') renderCalendar();
-  else if (state.view === 'booking') renderBooking();
   else if (state.view === 'records') renderRecords();
   else if (state.view === 'mine') renderMine();
 }
@@ -251,18 +261,29 @@ function cellInfo(v, ds) {
   const esc = s => (s == null ? '?' : String(s)).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
   const isPast = ds < todayStr();
   const per = vehiclePeriodOn(v, ds);
-  if (per && per.type === 'damage') return { cls: 'unavailable', txt: '损坏' };
-  if (per) return { cls: 'warning', txt: per.type === 'repair' ? '维修' : '保养' };
-  const books = state.reservations.filter(r => r.vehicleId === v.id && r.date === ds && r.status !== 'cancelled');
   const rest = isRestOn(ds, v.plate);
-  if (isPast) {
-    if (books.length) return { cls: 'past', txt: books.map(b => esc(b.applicant)).join('<br>') };
-    return { cls: 'past', txt: '—' };
+  const books = state.reservations.filter(r => r.vehicleId === v.id && r.date === ds && r.status !== 'cancelled');
+  const names = books.map(b => esc(b.applicant)).join('<br>');
+
+  // 损坏：过去日期归为 past，未来不可预约
+  if (per && per.type === 'damage') {
+    return { cls: isPast ? 'past' : 'unavailable', txt: books.length ? ('损坏<br>' + names) : '损坏' };
   }
-  if (books.length) {
-    const names = books.map(b => esc(b.applicant)).join('<br>');
-    return { cls: rest ? 'restricted-booked' : 'booked', txt: rest ? names + '<br>限' : names };
+  // 维修 / 保养 / 其他：叠加限行标记，有预约则显示完整使用人
+  if (per) {
+    const baseText = per.type === 'repair' ? '维修' : per.type === 'maintenance' ? '保养' : '其他';
+    const suffix = rest ? '+限' : '';
+    const txt = books.length ? (baseText + '<br>' + names + suffix) : (baseText + suffix);
+    let cls;
+    if (isPast) cls = 'past';
+    else if (books.length) cls = rest ? 'restricted-booked' : 'warning-booked';
+    else cls = rest ? 'restricted-free' : 'warning';
+    return { cls, txt };
   }
+  // 已过去
+  if (isPast) return { cls: 'past', txt: books.length ? names : '—' };
+  // 未来（含今天）
+  if (books.length) return { cls: rest ? 'restricted-booked' : 'booked', txt: rest ? names + '<br>限' : names };
   return { cls: rest ? 'restricted-free' : 'free', txt: rest ? '限行' : '可约' };
 }
 function legendHTML() {
@@ -296,8 +317,12 @@ function renderDetail() {
     const c = cellInfo(v, ds); const rest = isRestOn(ds, v.plate);
     let infoHtml = '', freeText = '可预约', freeColor = 'var(--ok)', canBook = true;
     if (c.cls === 'unavailable') { freeText = '损坏 · 不可预约'; freeColor = '#6b7280'; canBook = false; }
-    else if (c.cls === 'warning') { freeText = (c.txt === '维修' ? '维修中' : '保养中') + ' · 可预约'; freeColor = 'var(--warn)'; }
-    else if (['booked', 'restricted-booked', 'past'].includes(c.cls)) {
+    else if (c.cls === 'warning') {
+      const per = vehiclePeriodOn(v, ds);
+      const t = per && per.type === 'repair' ? '维修中' : per && per.type === 'maintenance' ? '保养中' : '存在异常';
+      freeText = t + ' · 可预约'; freeColor = 'var(--warn)';
+    }
+    else if (['booked', 'restricted-booked', 'warning-booked', 'past'].includes(c.cls)) {
       const books = state.reservations.filter(r => r.vehicleId === v.id && r.date === ds && r.status !== 'cancelled');
       if (books.length) {
         infoHtml = books.map(b => `🕐 ${b.startTime || ''}-${b.endTime || ''} 👤 <b>${b.applicant || '?'}</b> ${destLink(b)}`).join('<br>');
@@ -311,51 +336,90 @@ function renderDetail() {
 }
 
 /* ================= 预约 ================= */
-function buildDateStrip() {
-  const out = []; const t = todayObj();
-  for (let i = 0; i < 14; i++) { const d = new Date(t); d.setDate(t.getDate() + i); out.push({ ds: fmt(d), m: d.getMonth() + 1, d: d.getDate(), label: wkLabel(d), weekend: d.getDay() === 0 || d.getDay() === 6 }); }
-  return out;
-}
-function renderBooking() {
+/* ---------- 预约填写：日历内直接弹窗（逻辑对齐小程序 booking 页） ---------- */
+// 把弹窗里已填内容回写到 state.bk（切换车辆/日期、打开地图前调用，避免丢失）
+function saveBookingForm(scope) {
+  const g = id => (scope || document).querySelector('#' + id);
   const bk = state.bk;
-  const strip = buildDateStrip();
-  if (!bk.selDate || !strip.find(s => s.ds === bk.selDate)) bk.selDate = strip[0].ds;
-  const vehiclesHTML = state.vehicles.map(v => {
-    const st = vehicleStatus(v, bk.selDate);
-    const disabled = st.cls === 'damage';
-    const badgeColor = st.cls === 'damage' ? '#6b7280' : st.cls === 'normal' ? 'var(--ok)' : st.cls === 'warning' ? 'var(--warn)' : 'var(--err)';
-    const badgeBg = st.cls === 'damage' ? '#eceef1' : st.cls === 'normal' ? 'var(--ok-bg)' : st.cls === 'warning' ? 'var(--warn-bg)' : 'var(--err-bg)';
-    return `<div class="vp ${bk.selVehicleId === v.id ? 'active' : ''} ${disabled ? 'disabled' : ''}" data-vid="${v.id}">${v.plate}<span class="vps" style="color:${badgeColor};background:${badgeBg}">${st.text}</span></div>`;
+  if (g('bkVehicle')) bk.selVehicleId = g('bkVehicle').value;
+  if (g('bkDate')) bk.selDate = g('bkDate').value;
+  if (g('bkStart')) bk.startTime = g('bkStart').value;
+  if (g('bkEnd')) bk.endTime = g('bkEnd').value;
+  if (g('bkUser')) bk.userPerson = g('bkUser').value.trim();
+  if (g('bkEvent')) bk.eventType = g('bkEvent').value;
+  if (g('bkDest')) bk.destAddress = g('bkDest').value.trim();
+  if (g('bkNote')) bk.note = g('bkNote').value.trim();
+}
+// 当日已有预约（让用户看到已占用时段，对齐小程序 dayModalBookings）
+function dayBooksHTML(vid, ds) {
+  const list = state.reservations.filter(r => r.vehicleId === vid && r.date === ds && r.status !== 'cancelled');
+  if (!list.length) return '';
+  const items = list.map(r => `<div class="db-item"><span class="db-time">${r.startTime || '?'}-${r.endTime || '?'}</span><span class="db-user">${escapeHtml(r.applicant || '?')}</span>${destLink(r)}</div>`).join('');
+  return `<div class="day-books"><div class="db-hd">当日已有预约</div>${items}</div>`;
+}
+function openBookingModal(vehicleId, dateStr) {
+  const bk = state.bk;
+  if (vehicleId) bk.selVehicleId = vehicleId;
+  if (dateStr) bk.selDate = dateStr;
+  if (!bk.selDate) bk.selDate = todayStr();
+  if (!bk.startTime) bk.startTime = '09:00';
+  if (!bk.endTime) bk.endTime = '12:00';
+  if (!bk.userPerson && state.user) bk.userPerson = state.user.displayName || '';
+  if (!bk.selVehicleId && state.vehicles.length) bk.selVehicleId = state.vehicles[0].id;
+
+  const v = state.vehicles.find(x => x.id === bk.selVehicleId);
+  const note = v ? vehicleStatusNote(v, bk.selDate) : { type: 'warn', msg: '暂无可预约车辆' };
+  const base = todayObj();
+  const dateOpts = Array.from({ length: 30 }, (_, i) => { const d = new Date(base); d.setDate(base.getDate() + i); return d; })
+    .map(d => `<option value="${fmt(d)}" ${fmt(d) === bk.selDate ? 'selected' : ''}>${d.getMonth() + 1}/${d.getDate()} ${wkLabel(d)}</option>`).join('');
+  const vehOpts = state.vehicles.map(x => {
+    const st = vehicleStatus(x, bk.selDate);
+    return `<option value="${x.id}" ${x.id === bk.selVehicleId ? 'selected' : ''}>${x.plate}（${st.text}）</option>`;
   }).join('');
-  const datesHTML = strip.map(s => `<div class="dc ${bk.selDate === s.ds ? 'active' : ''} ${s.weekend ? 'weekend' : ''}" data-ds="${s.ds}"><span class="dcd">${s.m}/${s.d}</span><span class="dcw">${s.label}</span></div>`).join('');
-  let alert = '';
-  if (!bk.selVehicleId) alert = `<div class="alert alert-w">请选择车辆</div>`;
-  else { const v = state.vehicles.find(x => x.id === bk.selVehicleId); const st = vehicleStatus(v, bk.selDate); if (st.cls === 'damage') alert = `<div class="alert alert-e">该车已损坏，不可预约</div>`; else if (st.cls === 'restricted') alert = `<div class="alert alert-w">该车当日限行（7:00-20:00），仍可预约</div>`; else if (st.cls === 'warning') alert = `<div class="alert alert-w">该车当日${st.text}中，仍可预约</div>`; else alert = `<div class="alert alert-o">此车辆状态正常，可预约</div>`; }
-  const canSubmit = !!(bk.selVehicleId && bk.selDate && bk.userPerson);
   const evOptions = EVENT_TYPES.map(e => `<option value="${e}" ${bk.eventType === e ? 'selected' : ''}>${e}</option>`).join('');
-  $('#bookingView').innerHTML = `
-    <div class="bk-card"><div class="bk-step"><span class="num">1</span> 车辆</div>
-      <div class="vpick">${vehiclesHTML}</div>${alert}</div>
-    <div class="bk-card"><div class="bk-step"><span class="num">2</span> 日期</div>
-      <div class="dstrip">${datesHTML}</div></div>
-    <div class="bk-card"><div class="bk-step"><span class="num">3</span> 时间</div>
-      <div class="time-row"><input type="time" id="bkStart" class="fg-input" value="${bk.startTime}"><span style="font-weight:700;color:var(--text3)">—</span><input type="time" id="bkEnd" class="fg-input" value="${bk.endTime}"></div></div>
-    <div class="bk-card"><div class="bk-step"><span class="num">4</span> 信息</div>
-      <div class="fg"><label class="fg-label">使用人</label><input id="bkUser" class="fg-input" placeholder="请输入姓名" value="${bk.userPerson}"></div>
+  const canSubmit = !!(bk.selVehicleId && bk.selDate && bk.userPerson) && note.type !== 'err';
+  const d = parseDS(bk.selDate);
+
+  const body = `
+    <div class="bk-modal">
+      <div class="bk-mhead">${v ? escapeHtml(v.plate) : '车辆'} · ${d.getMonth() + 1}月${d.getDate()}日 ${WD[d.getDay()]}</div>
+      <div class="fg-row">
+        <div class="fg"><label class="fg-label">车辆</label><select id="bkVehicle" class="fg-input">${vehOpts || '<option value="">暂无车辆</option>'}</select></div>
+        <div class="fg"><label class="fg-label">日期</label><select id="bkDate" class="fg-input">${dateOpts}</select></div>
+      </div>
+      <div class="alert alert-${note.type === 'err' ? 'e' : note.type === 'warn' ? 'w' : 'o'}">${escapeHtml(note.msg)}</div>
+      ${dayBooksHTML(bk.selVehicleId, bk.selDate)}
+      <div class="fg"><label class="fg-label">使用时间</label>
+        <div class="time-row"><input type="time" id="bkStart" class="fg-input" value="${bk.startTime}"><span style="font-weight:700;color:var(--text3)">—</span><input type="time" id="bkEnd" class="fg-input" value="${bk.endTime}"></div></div>
+      <div class="fg"><label class="fg-label">使用人</label><input id="bkUser" class="fg-input" placeholder="请输入姓名" value="${escapeHtml(bk.userPerson)}"></div>
       <div class="fg"><label class="fg-label">事项（选填）</label><select id="bkEvent" class="fg-input"><option value="">如：开会、验收、接机</option>${evOptions}</select></div>
       <div class="fg"><label class="fg-label">目的地（选填）</label>
         <div class="dest-row">
-          <input id="bkDest" class="fg-input" placeholder="如：望京SOHO" value="${escapeHtml(bk.destAddress || bk.purpose)}">
+          <input id="bkDest" class="fg-input" placeholder="如：望京SOHO" value="${escapeHtml(bk.destAddress || '')}">
           <button id="bkMapPick" class="btn-map" type="button">📍 地图选点</button>
         </div>
         <div id="bkMapInfo" class="map-info ${bk.destLng != null ? 'show' : ''}">${bk.destLng != null ? ('已选坐标：' + Number(bk.destLat).toFixed(6) + ', ' + Number(bk.destLng).toFixed(6)) : '未标注坐标，可点击「地图选点」在地图上选位置'}</div>
       </div>
-      <div class="fg"><label class="fg-label">备注（选填）</label><input id="bkNote" class="fg-input" placeholder="如有特殊需求请注明" value="${bk.note}"></div>
+      <div class="fg"><label class="fg-label">备注（选填）</label><input id="bkNote" class="fg-input" placeholder="如有特殊需求请注明" value="${escapeHtml(bk.note)}"></div>
       <button id="bkSubmit" class="btn-primary" ${canSubmit ? '' : 'disabled'}>确认预约</button>
     </div>`;
+
+  openModal('预约用车', body, sheet => {
+    const g = id => sheet.querySelector('#' + id);
+    const rerender = () => { saveBookingForm(sheet); openBookingModal(bk.selVehicleId, bk.selDate); };
+    const vs = g('bkVehicle'); if (vs) vs.onchange = rerender;
+    const dsSel = g('bkDate'); if (dsSel) dsSel.onchange = rerender;
+    const us = g('bkUser');
+    if (us) us.oninput = () => { bk.userPerson = us.value.trim(); const sb = g('bkSubmit'); if (sb) sb.disabled = !(bk.selVehicleId && bk.selDate && bk.userPerson); };
+    const mp = g('bkMapPick');
+    if (mp) mp.onclick = () => { saveBookingForm(sheet); openMapPicker(() => openBookingModal(bk.selVehicleId, bk.selDate)); };
+    const sb = g('bkSubmit'); if (sb) sb.onclick = submitBooking;
+  });
 }
-async function openMapPicker() {
+async function openMapPicker(onDone) {
   const bk = state.bk;
+  let _mapDone = false;
+  const fireDone = () => { if (_mapDone) return; _mapDone = true; if (onDone) setTimeout(onDone, 0); };
   const body = `
     <div class="map-pick">
       <div class="map-search"><input id="mapSearch" class="fg-input" placeholder="搜索地点，如：望京SOHO"></div>
@@ -367,7 +431,7 @@ async function openMapPicker() {
         <button id="mapConfirm" class="btn-primary" type="button">确认选择</button>
       </div>
     </div>`;
-  openModal('选择目的地位置', body, async (sheet) => {
+  const mask = openModal('选择目的地位置', body, async (sheet) => {
     const addrEl = sheet.querySelector('#mapAddr');
     const dbgEl = sheet.querySelector('#mapDbg');
     const destInput = document.getElementById('bkDest');
@@ -419,6 +483,7 @@ async function openMapPicker() {
         const info = document.getElementById('bkMapInfo');
         if (info) { info.classList.add('show'); info.textContent = '已选坐标：' + Number(bk.destLat).toFixed(6) + ', ' + Number(bk.destLng).toFixed(6); }
         closeModal();
+        fireDone();
       });
       sheet.querySelector('#mapClear').addEventListener('click', () => {
         bk.destLng = null; bk.destLat = null; bk.destAddress = '';
@@ -436,16 +501,23 @@ async function openMapPicker() {
       addrEl.textContent = '地图初始化异常：' + (err && err.message ? err.message : err) + '（常见：Key 类型须为「Web端(JS API)」、Key 与安全密钥须配对）';
     }
   });
+  // 关闭地图（✕ / 点遮罩）时回到预约表单，避免已填内容丢失
+  if (mask) {
+    const cb = mask.querySelector('.modal-close'); if (cb) cb.addEventListener('click', fireDone);
+    mask.addEventListener('click', e => { if (e.target === mask) fireDone(); });
+  }
 }
 async function submitBooking() {
+  saveBookingForm();
   const bk = state.bk;
-  bk.startTime = $('#bkStart').value; bk.endTime = $('#bkEnd').value;
-  bk.userPerson = $('#bkUser').value.trim(); bk.eventType = $('#bkEvent').value;
-  bk.purpose = $('#bkDest').value.trim(); bk.note = $('#bkNote').value.trim();
   if (!bk.selVehicleId || !bk.selDate || !bk.userPerson) { toast('请完善信息'); return; }
   if (bk.startTime >= bk.endTime) { toast('结束时间须晚于开始时间'); return; }
+  if (bk.selDate < todayStr()) { toast('不能预约过去的日期'); return; }
   const v = state.vehicles.find(x => x.id === bk.selVehicleId);
-  const body = { vehicleId: bk.selVehicleId, date: bk.selDate, allDay: false, startTime: bk.startTime, endTime: bk.endTime, applicant: bk.userPerson, purpose: bk.eventType, destination: bk.purpose, notes: bk.note, destLng: bk.destLng, destLat: bk.destLat, destAddress: bk.destAddress };
+  if (!v) { toast('请选择车辆'); return; }
+  const per = vehiclePeriodOn(v, bk.selDate);
+  if (per && per.type === 'damage') { toast('该车已损坏，不可预约'); return; }
+  const body = { vehicleId: bk.selVehicleId, date: bk.selDate, allDay: false, startTime: bk.startTime, endTime: bk.endTime, applicant: bk.userPerson, purpose: bk.eventType, destination: bk.destAddress, notes: bk.note, destLng: bk.destLng, destLat: bk.destLat, destAddress: bk.destAddress };
   const restricted = isRestrictedForBooking(bk.selDate, v.plate, bk.startTime, bk.endTime);
   const conflict = hasConflict(bk.selVehicleId, bk.selDate, bk.startTime, bk.endTime);
   if (restricted && !confirm(`⚠️ 限行提醒\n${v.plate} 在 ${bk.selDate} 限行。\n确认仍要预约吗？`)) return;
@@ -453,8 +525,12 @@ async function submitBooking() {
   const r = await api('/reservations', { method: 'POST', body });
   if (r.ok) {
     toast('预约成功');
+    const keepDate = bk.selDate, keepVid = bk.selVehicleId;
     state.bk = { selVehicleId: null, selDate: null, startTime: '09:00', endTime: '12:00', userPerson: '', eventType: '', purpose: '', note: '', destLng: null, destLat: null, destAddress: '' };
-    await reload(); switchView('calendar');
+    closeModal();
+    state.calSelDate = keepDate; state.calSelVehicleId = keepVid;
+    await reload();
+    if (state.view === 'calendar') renderCalendar(); else switchView('calendar');
   } else { toast((r.data && r.data.error) || '预约失败'); }
 }
 
@@ -686,21 +762,16 @@ function bindEvents() {
   };
 
   // 日历
-  $('#calFixed').addEventListener('click', e => { const row = e.target.closest('.cf-row'); if (row) { state.openBooking = { vehicleId: row.dataset.vid, date: state.calSelDate || todayStr() }; switchView('booking'); } });
+  // 日历：点击车辆列 / 日历格子 → 直接弹出预约填写（过去日期与损坏车辆除外）
+  $('#calFixed').addEventListener('click', e => { const row = e.target.closest('.cf-row'); if (row) openBookingModal(row.dataset.vid, state.calSelDate || todayStr()); });
   $('#calHead').addEventListener('click', e => { const c = e.target.closest('.ch-cell'); if (c) { state.calSelDate = c.dataset.ds; renderCalendar(); } });
-  $('#calRows').addEventListener('click', e => { const c = e.target.closest('.cal-cell'); if (!c) return; if (c.classList.contains('unavailable')) return; state.calSelDate = c.dataset.ds; state.calSelVehicleId = c.dataset.vid; renderCalendar(); });
-  $('#calDetail').addEventListener('click', e => { const b = e.target.closest('.detail-go'); if (b) { state.openBooking = { vehicleId: b.dataset.vid, date: b.dataset.ds }; switchView('booking'); } });
-
-  // 预约
-  $('#bookingView').addEventListener('click', e => {
-    const vp = e.target.closest('.vp'); if (vp && !vp.classList.contains('disabled')) { state.bk.selVehicleId = vp.dataset.vid; renderBooking(); }
-    const dc = e.target.closest('.dc'); if (dc) { state.bk.selDate = dc.dataset.ds; renderBooking(); }
-    if (e.target.id === 'bkSubmit') submitBooking();
-    if (e.target.id === 'bkMapPick') openMapPicker();
+  $('#calRows').addEventListener('click', e => {
+    const c = e.target.closest('.cal-cell'); if (!c) return;
+    state.calSelDate = c.dataset.ds; state.calSelVehicleId = c.dataset.vid; renderCalendar();
+    if (c.classList.contains('past') || c.classList.contains('unavailable')) return;
+    openBookingModal(c.dataset.vid, c.dataset.ds);
   });
-  $('#bookingView').addEventListener('input', e => {
-    if (e.target.id === 'bkUser') { state.bk.userPerson = e.target.value.trim(); $('#bkSubmit').disabled = !(state.bk.selVehicleId && state.bk.selDate && state.bk.userPerson); }
-  });
+  $('#calDetail').addEventListener('click', e => { const b = e.target.closest('.detail-go'); if (b) openBookingModal(b.dataset.vid, b.dataset.ds); });
 
   // 记录
   $('#recFilters').addEventListener('click', e => { const f = e.target.closest('.fc'); if (f) { state.recFilter = f.dataset.key; renderRecords(); } });
