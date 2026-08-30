@@ -271,22 +271,23 @@ function cellInfo(v, ds) {
   if (per && per.type === 'damage') {
     return { cls: isPast ? 'past' : 'unavailable', txt: books.length ? ('损坏<br>' + names) : '损坏' };
   }
-  // 维修 / 保养 / 其他：叠加限行标记，有预约则显示完整使用人
+  // 维修 / 保养 / 其他：限行标记紧跟状态（如「维修+限」），有预约则换行显示使用人
   if (per) {
     const baseText = per.type === 'repair' ? '维修' : per.type === 'maintenance' ? '保养' : '其他';
-    const suffix = rest ? '+限' : '';
-    const txt = books.length ? (baseText + '<br>' + names + suffix) : (baseText + suffix);
+    const head = rest ? baseText + '+限' : baseText;
+    const txt = books.length ? (head + '<br>' + names) : head;
     let cls;
     if (isPast) cls = 'past';
     else if (books.length) cls = rest ? 'restricted-booked' : 'warning-booked';
     else cls = rest ? 'restricted-free' : 'warning';
     return { cls, txt };
   }
-  // 已过去：信息量与未来日期保持一致（有预约显示使用人，无预约显示「已过」），
-  // 但统一灰色、只读——详情栏可看明细，不出现「预约此车」
+  // 已过去：与未来日期同等信息量，统一灰色、只读（详情栏可看明细，不出现「预约此车」）
+  //   有预约   -> 使用人，限行时另起一行标「限」
+  //   无预约   -> 限行显示「限」，不限行显示「已过」
   if (isPast) {
     if (books.length) return { cls: 'past', txt: rest ? names + '<br>限' : names };
-    return { cls: 'past', txt: '已过' };
+    return { cls: 'past', txt: rest ? '限' : '已过' };
   }
   // 未来（含今天）
   if (books.length) return { cls: rest ? 'restricted-booked' : 'booked', txt: rest ? names + '<br>限' : names };
