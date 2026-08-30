@@ -195,6 +195,8 @@
       obj.forced = !!obj.force; delete obj.force;
       if (obj.allDay == null) obj.allDay = false;
       obj.status = 'pending';
+      obj.createdName = obj.createdName || obj.applicant || '';
+      obj.createdBy = obj.createdBy || null;
       obj.createdAt = new Date().toISOString();
       obj.id = genId('res');
       _cache.reservations = _cache.reservations || []; _cache.reservations.push(obj);
