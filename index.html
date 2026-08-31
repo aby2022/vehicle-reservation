@@ -85,6 +85,19 @@
           <select id="recVehicleSel" class="rec-vsel"></select>
           <button id="recExport" class="rec-export">📥 导出</button>
         </div>
+        <div class="rec-daterow">
+          <span class="rec-date-lb">使用日期</span>
+          <input type="date" id="recDateFrom" class="rec-date" aria-label="开始日期" />
+          <span class="rec-date-sep">至</span>
+          <input type="date" id="recDateTo" class="rec-date" aria-label="结束日期" />
+          <span class="rec-date-clear hidden" id="recDateClear">清除</span>
+        </div>
+        <div id="recDateQuick" class="rec-quick">
+          <span class="dq" data-quick="today">今天</span>
+          <span class="dq" data-quick="week">近7天</span>
+          <span class="dq" data-quick="month">本月</span>
+          <span class="dq" data-quick="lastmonth">上月</span>
+        </div>
         <div id="recList"></div>
       </section>
 
