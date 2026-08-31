@@ -101,7 +101,7 @@ const state = {
   view: 'calendar',
   calDates: [], calSelDate: todayStr(), calSelVehicleId: null,
   bk: { selVehicleId: null, selDate: null, startTime: '09:00', endTime: '12:00', userPerson: '', eventType: '', customEvent: '', purpose: '', note: '', destLng: null, destLat: null, destAddress: '' },
-  recFilter: 'all', recVehicle: '',
+  recFilter: 'all', recVehicle: '', recDateFrom: '', recDateTo: '',
   mineTab: 'vehicles', users: []
 };
 
@@ -578,10 +578,23 @@ function recStatusOf(r) {
   if (r.status === 'completed' || r.status === 'active') return r.status;
   return (r.date && r.date < todayStr()) ? 'completed' : 'pending';
 }
+// 记录页常用日期区间快捷项（today/week/month/lastmonth）
+function quickRange(q) {
+  const d = new Date(); const y = d.getFullYear(), m = d.getMonth(), dd = d.getDate();
+  const fmt = (yy, mm, day) => `${yy}-${String(mm + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  if (q === 'today') { const t = todayStr(); return { from: t, to: t }; }
+  if (q === 'week') { const s = new Date(y, m, dd), e2 = new Date(y, m, dd + 6); return { from: fmt(s.getFullYear(), s.getMonth(), s.getDate()), to: fmt(e2.getFullYear(), e2.getMonth(), e2.getDate()) }; }
+  if (q === 'month') return { from: fmt(y, m, 1), to: fmt(y, m, new Date(y, m + 1, 0).getDate()) };
+  if (q === 'lastmonth') { const lm = new Date(y, m - 1, 1); return { from: fmt(lm.getFullYear(), lm.getMonth(), 1), to: fmt(lm.getFullYear(), lm.getMonth(), new Date(lm.getFullYear(), lm.getMonth() + 1, 0).getDate()) }; }
+  return { from: '', to: '' };
+}
 function applyRecFilter(list) {
   const today = todayStr(); const u = state.user;
   let out = list;
   if (state.recVehicle) out = out.filter(r => r.vehicleId === state.recVehicle);
+  // 使用日期范围（含首尾，按 r.date 字符串比较，YYYY-MM-DD 字典序即时间序）
+  if (state.recDateFrom) out = out.filter(r => (r.date || '') >= state.recDateFrom);
+  if (state.recDateTo) out = out.filter(r => (r.date || '') <= state.recDateTo);
   const f = state.recFilter;
   if (f === 'today') return out.filter(r => r.date === today);
   if (f === 'upcoming') return out.filter(r => r.date >= today && recStatusOf(r) === 'pending');
@@ -596,8 +609,20 @@ function renderRecords() {
   $('#recFilters').innerHTML = filters.map(([k, l]) => `<div class="fc ${state.recFilter === k ? 'active' : ''}" data-key="${k}">${l}</div>`).join('');
   const vsel = $('#recVehicleSel');
   if (vsel) vsel.innerHTML = `<option value="">全部车辆</option>` + state.vehicles.map(v => `<option value="${v.id}" ${state.recVehicle === v.id ? 'selected' : ''}>${escapeHtml(v.plate)}</option>`).join('');
+  const dqRoot = $('#recDateQuick');
+  if (dqRoot) dqRoot.innerHTML = [['today', '今天'], ['week', '近7天'], ['month', '本月'], ['lastmonth', '上月']]
+    .map(([k, l]) => { const rg = quickRange(k); const on = (rg.from || rg.to) && state.recDateFrom === rg.from && state.recDateTo === rg.to; return `<span class="dq${on ? ' active' : ''}" data-quick="${k}">${l}</span>`; }).join('');
   let list = applyRecFilter(state.reservations.slice()).sort((a, b) => (b.date + (b.startTime || '')).localeCompare(a.date + (a.startTime || '')));
-  if (!list.length) { $('#recList').innerHTML = `<div class="empty-state">暂无记录</div>`; return; }
+  const dclr = $('#recDateClear'); if (dclr) dclr.classList.toggle('hidden', !(state.recDateFrom || state.recDateTo));
+  if (!list.length) {
+    const cond = [];
+    if (state.recDateFrom || state.recDateTo) cond.push(`日期 ${state.recDateFrom || '最早'} ~ ${state.recDateTo || '最新'}`);
+    if (state.recVehicle) { const v = state.vehicles.find(x => x.id === state.recVehicle); if (v) cond.push(`车辆 ${v.plate}`); }
+    const fl = { mine: '我的预约', upcoming: '即将出行', today: '今日', completed: '已完成', cancelled: '已取消' }[state.recFilter];
+    if (fl) cond.push(fl);
+    $('#recList').innerHTML = `<div class="empty-state">${cond.length ? '暂无符合条件的记录' : '暂无记录'}${cond.length ? `<div class="es-sub">当前条件：${escapeHtml(cond.join(' · '))}</div>` : ''}</div>`;
+    return;
+  }
   const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
   const groups = {};
   list.forEach(r => { const ym = r.date.slice(0, 7); (groups[ym] = groups[ym] || []).push(r); });
@@ -834,6 +859,26 @@ function bindEvents() {
   $('#recList').addEventListener('click', e => {
     const c = e.target.closest('.rec-cancel'); if (c) { cancelRes(c.dataset.id); return; }
     const g = e.target.closest('.rec-grp-hd'); if (g) { g.classList.toggle('folded'); const b = g.nextElementSibling; if (b) b.classList.toggle('folded'); }
+  });
+  // 记录页 · 使用日期范围查询
+  const rdf = $('#recDateFrom'), rdt = $('#recDateTo');
+  function syncDateInputs() { if (rdf) rdf.value = state.recDateFrom || ''; if (rdt) rdt.value = state.recDateTo || ''; }
+  if (rdf) rdf.addEventListener('change', () => {
+    state.recDateFrom = rdf.value;
+    // 起始晚于结束时自动顶高结束日，避免出现恒空区间
+    if (state.recDateTo && state.recDateFrom && state.recDateFrom > state.recDateTo) { state.recDateTo = state.recDateFrom; syncDateInputs(); }
+    renderRecords();
+  });
+  if (rdt) rdt.addEventListener('change', () => {
+    state.recDateTo = rdt.value;
+    if (state.recDateFrom && state.recDateTo && state.recDateTo < state.recDateFrom) { state.recDateFrom = state.recDateTo; syncDateInputs(); }
+    renderRecords();
+  });
+  $('#recDateClear').addEventListener('click', () => { state.recDateFrom = ''; state.recDateTo = ''; syncDateInputs(); renderRecords(); });
+  $('#recDateQuick').addEventListener('click', e => {
+    const b = e.target.closest('.dq'); if (!b) return;
+    const rg = quickRange(b.dataset.quick); state.recDateFrom = rg.from; state.recDateTo = rg.to;
+    syncDateInputs(); renderRecords();
   });
   $('#recExport').onclick = exportCSV;
 
