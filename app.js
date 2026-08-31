@@ -257,7 +257,7 @@ function bannerHTML() {
   if ((wd === 0 || wd === 6) && !rs.weekendRestricted) return `<div class="ri">✅</div><div><div class="rl">今日不限行</div><div class="rd"></div><div class="rn">周末畅通</div></div>`;
   const tails = tailsFor(t);
   if (tails.length) return `<div class="ri">🚫</div><div><div class="rl">今日限行尾号</div><div class="rd">${tails.join('  ')}</div><div class="rn">7:00-20:00 五环内</div></div>`;
-  return `<div class="ri">✅</div><div><div class="rl">今日不限行</div><div class="rd"></div><div class="rn">${WD[wd]}无尾号限行</div></div>`;
+  return `<div class="ri">✅</div><div><div class="rl">今日不限行</div><div class="rd"></div><div class="rn">周${WD[wd]}无尾号限行</div></div>`;
 }
 function cellInfo(v, ds) {
   const esc = s => (s == null ? '?' : String(s)).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
@@ -362,7 +362,7 @@ function renderDetail() {
     const isSel = v.id === state.calSelVehicleId;
     return `<div class="detail-row ${isSel ? 'detail-sel' : ''} ${c.cls === 'past' ? 'past' : ''}"><span class="detail-plate">${v.plate}</span><div class="detail-info">${infoHtml || `<span class="detail-free" style="color:${freeColor}">${freeText}</span>`}</div>${canBook ? `<button class="detail-go" data-vid="${v.id}" data-ds="${ds}">预约此车 →</button>` : ''}</div>`;
   }).join('');
-  box.innerHTML = `<div class="detail-hd"><span class="detail-date">${d.getMonth() + 1}月${d.getDate()}日 ${WD[d.getDay()]}</span></div>${rows}`;
+  box.innerHTML = `<div class="detail-hd"><span class="detail-date">${d.getMonth() + 1}月${d.getDate()}日 周${WD[d.getDay()]}</span></div>${rows}`;
 }
 
 /* ================= 预约 ================= */
@@ -413,7 +413,7 @@ function openBookingModal(vehicleId, dateStr) {
 
   const body = `
     <div class="bk-modal">
-      <div class="bk-mhead">${v ? escapeHtml(v.plate) : '车辆'} · ${d.getMonth() + 1}月${d.getDate()}日 ${WD[d.getDay()]}</div>
+      <div class="bk-mhead">${v ? escapeHtml(v.plate) : '车辆'} · ${d.getMonth() + 1}月${d.getDate()}日 周${WD[d.getDay()]}</div>
       <div class="fg-row">
         <div class="fg"><label class="fg-label">车辆</label><select id="bkVehicle" class="fg-input">${vehOpts || '<option value="">暂无车辆</option>'}</select></div>
         <div class="fg"><label class="fg-label">日期</label><select id="bkDate" class="fg-input">${dateOpts}</select></div>
