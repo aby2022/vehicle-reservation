@@ -379,7 +379,7 @@ function renderDetail() {
     } else { freeText = rest ? '限行 · 7:00-20:00 五环内' : '可预约'; freeColor = rest ? 'var(--err)' : 'var(--ok)'; }
     if (c.cls === 'past') canBook = false;   // 过去日期只读：不出现「预约此车」
     const isSel = v.id === state.calSelVehicleId;
-    return `<div class="detail-row ${isSel ? 'detail-sel' : ''} ${c.cls === 'past' ? 'past' : ''}"><span class="detail-plate">${v.plate}</span><div class="detail-info">${infoHtml || `<span class="detail-free" style="color:${freeColor}">${freeText}</span>`}</div>${canBook ? `<button class="detail-go" data-vid="${v.id}" data-ds="${ds}">${books.length ? '＋ 新增预约' : '预约此车 →'}</button>` : ''}</div>`;
+    return `<div class="detail-row ${isSel ? 'detail-sel' : ''} ${c.cls === 'past' ? 'past' : ''}"><span class="detail-plate">${v.plate}</span><div class="detail-info">${infoHtml || `<span class="detail-free" style="color:${freeColor}">${freeText}</span>`}</div>${canBook ? `<button class="detail-go" data-vid="${v.id}" data-ds="${ds}">${books.length ? '修改/取消/新增预约' : '预约此车 →'}</button>` : ''}</div>`;
   }).join('');
   box.innerHTML = `<div class="detail-hd"><span class="detail-date">${d.getMonth() + 1}月${d.getDate()}日 周${WD[d.getDay()]}</span></div>${rows}`;
 }
