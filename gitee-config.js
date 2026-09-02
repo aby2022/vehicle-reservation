@@ -15,4 +15,8 @@ window.GITEE_CONFIG = {
   branch: 'master',                // 默认分支（Gitee 新建仓库多为 master）
   path: 'data.json',               // 数据文件名（放在仓库根目录）
   pat: 'fced004445bf667172620917b8604880'  // 仅勾 projects 权限的专用私人令牌
+  ,
+  // 云端同步 Worker（Cloudflare Worker）地址：进页面时由它去拉腾讯文档并写回 Gitee。
+  // 部署 Worker 后填入，例如 'https://vr-sync.xxxxxx.workers.dev/sync'；留空则不做进页面同步。
+  syncWorkerUrl: 'https://vr-tdoc-sync.2456040366.workers.dev/sync'
 };
