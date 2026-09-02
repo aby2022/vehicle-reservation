@@ -117,6 +117,7 @@ const state = {
   token: localStorage.getItem('vr_token') || null,
   user: null,
   vehicles: [], reservations: [], restriction: null,
+  tdocMeta: null,
   view: 'calendar',
   calDates: [], calSelDate: todayStr(), calSelVehicleId: null,
   bk: blankBk(),
@@ -228,18 +229,20 @@ function doLogout() {
 
 /* ---------- 数据加载 ---------- */
 async function loadAll() {
-  const [v, r, rs] = await Promise.all([api('/vehicles'), api('/reservations'), api('/restriction')]);
+  const [v, r, rs, meta] = await Promise.all([api('/vehicles'), api('/reservations'), api('/restriction'), api('/meta')]);
   if (v.ok) state.vehicles = v.data;
   if (r.ok) state.reservations = r.data;
   if (rs.ok) state.restriction = rs.data;
+  if (meta.ok) state.tdocMeta = meta.data;
   state.calDates = buildCalDates();
   renderCurrent();
 }
 async function reload() {
-  const [v, r, rs] = await Promise.all([api('/vehicles'), api('/reservations'), api('/restriction')]);
+  const [v, r, rs, meta] = await Promise.all([api('/vehicles'), api('/reservations'), api('/restriction'), api('/meta')]);
   if (v.ok) state.vehicles = v.data;
   if (r.ok) state.reservations = r.data;
   if (rs.ok) state.restriction = rs.data;
+  if (meta.ok) state.tdocMeta = meta.data;
   state.calDates = buildCalDates();   // 跨天使用时刷新日期轴与「今天」标记
   renderCurrent();
 }
@@ -277,6 +280,20 @@ function bannerHTML() {
   const tails = tailsFor(t);
   if (tails.length) return `<div class="ri">🚫</div><div><div class="rl">今日限行尾号</div><div class="rd">${tails.join('  ')}</div><div class="rn">7:00-20:00 五环内</div></div>`;
   return `<div class="ri">✅</div><div><div class="rl">今日不限行</div><div class="rd"></div><div class="rn">周${WD[wd]}无尾号限行</div></div>`;
+}
+// 数据来源徽标：展示本次「今日以后」预约来自腾讯文档在线表格及最近同步时间
+function syncSrcHTML() {
+  const m = state.tdocMeta;
+  if (!m || !m.tdocSource) return '';
+  let when = '';
+  if (m.lastTdocSync) {
+    const d = new Date(m.lastTdocSync);
+    if (!isNaN(d)) {
+      const p = n => String(n).padStart(2, '0');
+      when = ` · 同步于 ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+  }
+  return `<span class="ss-ico">📄</span><span class="ss-txt">预约数据来源：腾讯文档《${m.tdocSource.replace('腾讯文档：', '')}》${when}</span>`;
 }
 function cellInfo(v, ds) {
   const esc = s => (s == null ? '?' : String(s)).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
@@ -343,6 +360,7 @@ function renderCalendar() {
     return `<div class="cf-row" data-vid="${v.id}"><span class="cf-plate">${v.plate}</span><span class="cf-meta">尾号${lastDig(v.plate)} · <span style="color:${st.cls === 'damage' ? '#6b7280' : st.cls === 'normal' ? 'var(--ok)' : 'var(--err)'};font-weight:700">${st.text}</span></span></div>`;
   }).join('');
   $('#calHead').innerHTML = state.calDates.map(d => `<div class="ch-cell ${d.ds === ds ? 'ch-today' : ''}" data-ds="${d.ds}"><span class="ch-d">${d.m}/${d.d}</span><span class="ch-w">${d.label}</span></div>`).join('');
+  $('#syncSrc').innerHTML = syncSrcHTML();
   $('#calRows').innerHTML = state.vehicles.map(v => `<div class="cal-row-d">` + state.calDates.map(d => {
     const c = cellInfo(v, d.ds);
     return `<div class="cal-cell ${c.cls} ${d.ds === ds ? 'today' : ''}" data-vid="${v.id}" data-ds="${d.ds}">${c.txt}</div>`;
