@@ -113,6 +113,11 @@ input, select, textarea { font-family: inherit; }
 .legend-item { display: flex; align-items: center; gap: 3px; }
 .legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 
+/* 数据来源徽标（腾讯文档同步） */
+.sync-src { display: flex; align-items: center; gap: 6px; padding: 8px 12px; margin-bottom: 8px; font-size: 11px; color: var(--text2); background: var(--brand-bg); border: 1px solid var(--border); border-radius: 10px; }
+.sync-src .ss-ico { font-size: 13px; }
+.sync-src .ss-txt { font-weight: 600; }
+
 /* 日期详情 */
 .detail-bar { background: var(--surface); border-radius: var(--r-lg); padding: 10px 14px; margin-top: 12px; box-shadow: var(--shadow); }
 .detail-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
