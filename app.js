@@ -237,7 +237,7 @@ async function ensureSynced() {
   if (overlay) overlay.classList.remove('hidden');
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 60000);   // 最多等 60s，避免卡死
+    const timer = setTimeout(() => ctrl.abort(), 15000);   // 最多等 15s：Worker 无响应也立刻放行，绝不卡住登录
     const res = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
     clearTimeout(timer);
     let j = null; try { j = await res.json(); } catch (e) {}
