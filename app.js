@@ -204,7 +204,7 @@ async function doLogin() {
   if (r.ok) {
     state.token = r.data.token; localStorage.setItem('vr_token', r.data.token);
     state.user = { role: r.data.role, userId: r.data.userId, username: r.data.username, displayName: r.data.displayName };
-    setAuthUI(); await loadAll(); switchView('calendar');
+    setAuthUI(); await ensureSynced(); await loadAll(); switchView('calendar');
   } else { $('#authErr').textContent = r.data && r.data.error ? r.data.error : '登录失败'; }
 }
 async function doRegister() {
@@ -217,7 +217,7 @@ async function doRegister() {
   if (r.ok) {
     state.token = r.data.token; localStorage.setItem('vr_token', r.data.token);
     state.user = { role: r.data.role, userId: r.data.userId, username: r.data.username, displayName: r.data.displayName };
-    setAuthUI(); await loadAll(); switchView('calendar');
+    setAuthUI(); await ensureSynced(); await loadAll(); switchView('calendar');
     toast('注册成功，已自动登录');
   } else { $('#authErr').textContent = r.data && r.data.error ? r.data.error : '注册失败'; }
 }
@@ -225,6 +225,37 @@ function doLogout() {
   api('/auth/logout', { method: 'POST' });
   state.token = null; state.user = null; localStorage.removeItem('vr_token'); state.reservations = []; state.vehicles = [];
   setAuthUI();
+}
+
+/* ---------- 进页面云端同步（Cloudflare Worker 拉腾讯文档 → Gitee） ---------- */
+let _syncing = false;
+async function ensureSynced() {
+  const url = ((window.GITEE_CONFIG && window.GITEE_CONFIG.syncWorkerUrl) || '').trim();
+  if (!url || _syncing) return;            // 未配置或正在同步则跳过
+  _syncing = true;
+  const overlay = document.getElementById('syncOverlay');
+  if (overlay) overlay.classList.remove('hidden');
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 60000);   // 最多等 60s，避免卡死
+    const res = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
+    clearTimeout(timer);
+    let j = null; try { j = await res.json(); } catch (e) {}
+    if (!res.ok || !j || !j.ok) {
+      toast('在线表格同步失败，显示的是上次数据' + ((j && j.error) ? '：' + j.error : ''));
+    } else if (!j.skipped) {
+      const parts = ['在线表格已同步'];
+      if (j.added) parts.push('新增' + j.added);
+      if (j.updated) parts.push('更新' + j.updated);
+      if (j.conflict) parts.push(j.conflict + ' 条冲突已备注');
+      toast(parts.join('，'));
+    }
+  } catch (e) {
+    toast('在线表格同步未响应，显示的是上次数据');   // 兜底：仍用上次数据渲染，不让页面白屏
+  } finally {
+    if (overlay) overlay.classList.add('hidden');
+    _syncing = false;
+  }
 }
 
 /* ---------- 数据加载 ---------- */
@@ -1144,5 +1175,5 @@ function openHelp() { openModal('使用说明', `<div class="help">${HELP_HTML}<
   bindEvents();
   const ok = await restoreAuth();
   setAuthUI();
-  if (ok) await loadAll();
+  if (ok) { await ensureSynced(); await loadAll(); }
 })();
