@@ -391,3 +391,26 @@ input, select, textarea { font-family: inherit; }
 .lg.warn { background: var(--warn-bg); color: var(--warn); }
 .lg.grey { background: #eceef1; color: #6b7280; }
 .nav-help { margin-top: 8px; border-top: 1px solid var(--divider); padding-top: 8px; }
+
+/* ---------- 进页面同步遮罩 ---------- */
+.sync-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(2px);
+}
+.sync-overlay.hidden { display: none; }
+.sync-overlay-box {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: 32px 40px; border-radius: 16px;
+  background: #fff; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+.sync-spinner {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 4px solid var(--divider, #e5e7eb);
+  border-top-color: var(--brand, #2f6bff);
+  animation: sync-spin 0.9s linear infinite;
+}
+@keyframes sync-spin { to { transform: rotate(360deg); } }
+.sync-text { font-size: 16px; font-weight: 600; color: var(--text, #1f2937); }
+.sync-sub { font-size: 12px; color: #8a94a6; }
