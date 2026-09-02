@@ -123,7 +123,8 @@ input, select, textarea { font-family: inherit; }
 .detail-info { font-size: 11px; color: var(--text2); line-height: 1.6; flex: 1; }
 .detail-free { font-size: 12px; font-weight: 600; }
 .detail-sel { background: var(--brand-bg); border-radius: 6px; padding-left: 6px; padding-right: 6px; }
-.detail-go { margin-left: auto; flex-shrink: 0; font-size: 12px; font-weight: 700; color: #fff; background: var(--brand); padding: 5px 12px; border-radius: 14px; white-space: nowrap; border: none; }
+/* 文案较长时允许折行，避免挤掉左侧的预约信息 */
+.detail-go { margin-left: auto; flex-shrink: 0; max-width: 46%; white-space: normal; text-align: center; line-height: 1.35; font-size: 12px; font-weight: 700; color: #fff; background: var(--brand); padding: 5px 12px; border-radius: 14px; border: none; }
 
 /* ============ 预约分步卡片 ============ */
 .bk-card { background: var(--surface); border-radius: var(--r-lg); padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow); }
