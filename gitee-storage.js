@@ -232,6 +232,7 @@
 
     // 限行 / 设置
     if (path === '/restriction' && method === 'GET') return _cache.restriction || defaultData().restriction;
+    if (path === '/meta' && method === 'GET') return { lastTdocSync: _cache._lastTdocSync || null, tdocSource: _cache._tdocSource || null };
     if (path === '/restriction' && method === 'PUT') { _cache.restriction = body; await persist('update restriction'); return {}; }
 
     // 用户管理（admin）
